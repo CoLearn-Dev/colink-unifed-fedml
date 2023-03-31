@@ -1,5 +1,5 @@
 {
-  "framework": "example",
+  "framework": "fedml",
   "algorithm": "fedavg",
   "dataset": "default_credit_horizontal",
   "model": "mlp_128",

@@ -6,8 +6,9 @@ import pytest
 import colink as CL
 
 
+
 def simulate_with_config(config_file_path):
-    from unifed.frameworks.example.protocol import pop, UNIFED_TASK_DIR
+    from unifed.frameworks.fedml.protocol import pop, UNIFED_TASK_DIR
     case_name = config_file_path.split("/")[-1].split(".")[0]
     with open(config_file_path, "r") as cf:
         config = json.load(cf)
@@ -20,10 +21,13 @@ def simulate_with_config(config_file_path):
     for _, role in config_participants:  # given user_ids are omitted and we generate new ones here
         cl = CL.InstantServer().get_colink().switch_to_generated_user()
         pop.run_attach(cl)
-        participants.append(CL.Participant(user_id=cl.get_user_id(), role=role))
+        participants.append(CL.Participant(
+            user_id=cl.get_user_id(), role=role))
         cls.append(cl)
-    task_id = cls[0].run_task("unifed.example", json.dumps(config), participants, True)
+    task_id = cls[0].run_task(
+        "unifed.fedml", json.dumps(config), participants, True)
     results = {}
+
     def G(key):
         r = cl.read_entry(f"{UNIFED_TASK_DIR}:{task_id}:{key}")
         if r is not None:
@@ -52,7 +56,8 @@ def test_with_config(config_file_path):
     if "skip" in config_file_path:
         pytest.skip("Skip this test case")
     results = simulate_with_config(config_file_path)
-    assert all([r["error"] is None and r["return"]["returncode"] == 0 for r in results[1].values()])
+    assert all([r["error"] is None and r["return"]["returncode"]
+               == 0 for r in results[1].values()])
 
 
 if __name__ == "__main__":
