@@ -4,6 +4,7 @@ import random
 
 import flbenchmark.logging
 
+
 def simulate_workload():
     argv = sys.argv
     # takes 3 args: mode(client/server), output, and logging destination
@@ -54,7 +55,8 @@ def simulate_logging(participant_id, role):
                 e.report_metric('accuracy', 99.9)
                 e.report_metric('mse', 0.2)
     elif role == 'client':
-        logger = flbenchmark.logging.Logger(id=participant_id, agent_type='client')
+        logger = flbenchmark.logging.Logger(
+            id=participant_id, agent_type='client')
         # Log the data processing
         logger.preprocess_data_start()
         sleep(0.3)
@@ -71,14 +73,17 @@ def simulate_logging(participant_id, role):
                 logger.computation_start()
                 sleep(random.random())  # Simulate the computation
                 # weights = [random.random(), random.random()]  # Get the gradient
-                logger.computation_end(metrics={'flop': 123, 'loss': 0.8})  # Report the cost of this computation and loss
+                # Report the cost of this computation and loss
+                logger.computation_end(metrics={'flop': 123, 'loss': 0.8})
             # Upload the gradient
             logger.communication_start(target_id=0)
             # pipe.send(weights)  # Simulate the network communication
-            logger.communication_end(metrics={'byte': 1234})  # Report the cost of this communication
+            # Report the cost of this communication
+            logger.communication_end(metrics={'byte': 1234})
             # Wait for the new model
             # weights = pipe.recv()
-            logger.training_round_end(metrics={'client_num': 2})  # Report the number of clients in this round
+            # Report the number of clients in this round
+            logger.training_round_end(metrics={'client_num': 2})
         logger.training_end()
         # End the logging
         logger.end()
