@@ -112,7 +112,6 @@ class FedAvgAPI(object):
                         # update global weights
                         with logger.computation() as c:
                             w_global = self._aggregate(w_locals)
-                        print('Helloooo!')
 
                         for idx, client in enumerate(self.client_list):
                             with logger.communication(target_id=idx + 1) as c:
@@ -182,7 +181,7 @@ class FedAvgAPI(object):
         subset = torch.utils.data.Subset(
             self.test_global.dataset, sample_indices)
         sample_testset = torch.utils.data.DataLoader(
-            subset, batch_size=self.args.batch_size)
+            subset, batch_size=self.config['training']['batch_size'])
         self.val_global = sample_testset
 
     def _aggregate(self, w_locals):
@@ -238,7 +237,7 @@ class FedAvgAPI(object):
 
         client = self.client_list[0]
 
-        for client_idx in range(self.args.client_num_in_total):
+        for client_idx in range(self.config['training']['tot_client_num']):
             """
             Note: for datasets like "fed_CIFAR100" and "fed_shakespheare",
             the training client number is larger than the testing client number
@@ -268,7 +267,7 @@ class FedAvgAPI(object):
             test_metrics['losses'].append(
                 copy.deepcopy(test_local_metrics['test_loss']))
 
-            if self.args.dataset in AUC:
+            if self.config['dataset'] in AUC:
                 if predict_my == None:
                     predict_my = test_local_metrics['predict']
                 else:
@@ -302,7 +301,7 @@ class FedAvgAPI(object):
 
         if self.is_regression:
             return test_loss
-        elif self.args.dataset not in AUC:
+        elif self.config['dataset'] not in AUC:
             return test_acc
         else:
             return roc_auc_score(target_my.cpu(), predict_my.cpu())
@@ -320,14 +319,14 @@ class FedAvgAPI(object):
         # test data
         test_metrics = client.local_test(True)
 
-        if self.args.dataset == "stackoverflow_nwp":
+        if self.config['dataset'] == "stackoverflow_nwp":
             test_acc = test_metrics['test_correct'] / \
                 test_metrics['test_total']
             test_loss = test_metrics['test_loss'] / test_metrics['test_total']
             stats = {'test_acc': test_acc, 'test_loss': test_loss}
             # wandb.log({"Test/Acc": test_acc, "round": round_idx})
             # wandb.log({"Test/Loss": test_loss, "round": round_idx})
-        elif self.args.dataset == "stackoverflow_lr":
+        elif self.config['dataset'] == "stackoverflow_lr":
             test_acc = test_metrics['test_correct'] / \
                 test_metrics['test_total']
             test_pre = test_metrics['test_precision'] / \
@@ -342,6 +341,6 @@ class FedAvgAPI(object):
             # wandb.log({"Test/Loss": test_loss, "round": round_idx})
         else:
             raise Exception(
-                "Unknown format to log metrics for dataset {}!" % self.args.dataset)
+                "Unknown format to log metrics for dataset {}!" % self.config['dataset'])
 
         logging.info(stats)
