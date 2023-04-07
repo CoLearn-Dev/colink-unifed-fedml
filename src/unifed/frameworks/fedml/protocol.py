@@ -124,15 +124,16 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         server_ip,
         [p for p in participants if p.role == "client"]
     )
-    participant_id = [
-        i for i, p in enumerate(participants)
-        if p.user_id == cl.get_user_id()
-    ][0]
 
     # Load configuration and setup server
     config = load_config_from_param_and_check(param)
     download(config)
 
+    # run external program
+    participant_id = [
+        i for i, p in enumerate(participants)
+        if p.user_id == cl.get_user_id()
+    ][0]
     return run_external_process_and_collect_result(cl, participant_id, "server", server_ip, config)
 
 

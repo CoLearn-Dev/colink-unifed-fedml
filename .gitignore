@@ -140,3 +140,6 @@ temp.json
 
 # VSCode
 .vscode
+
+# Data
+data/
