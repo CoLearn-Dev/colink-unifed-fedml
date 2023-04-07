@@ -3,7 +3,7 @@ import sys
 
 import torch
 
-from .main_fedavg import create_model, custom_model_trainer, load_data
+from .horizontal_exp import create_model, custom_model_trainer, load_data
 from .src.standalone.fedavg_api import FedAvgAPI
 
 

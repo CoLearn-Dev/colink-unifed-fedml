@@ -8,17 +8,10 @@ install_script = """
 if { conda env list | grep 'colink-protocol-unifed-fedml'; } >/dev/null 2>&1; then
     conda env remove -n colink-protocol-unifed-fedml
 fi
-conda create -n colink-protocol-unifed-fedml python=3.9 -y
+conda create -n colink-protocol-unifed-fedml python=3.10 -y
 conda activate colink-protocol-unifed-fedml
+pip install fedml==0.8.2
 pip install .
-pip install scikit-learn==1.1.3
-pip install flbenchmark==0.1.3
-pip install urllib3==1.26.11
-git clone https://github.com/FedML-AI/FedML.git
-cd FedML
-git checkout 2afd0ec302055ebf2e6e18b760caabf30704ba68
-cd python
-python setup.py install
 """
 entrypoint = """
 conda activate colink-protocol-unifed-fedml

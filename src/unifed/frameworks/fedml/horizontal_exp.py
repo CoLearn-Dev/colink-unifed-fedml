@@ -31,8 +31,6 @@ from .src.trainer.classification_trainer import ClassificationTrainer
 from .src.trainer.nwp_trainer import NWPTrainer
 from .src.trainer.regression_trainer import RegressionTrainer
 
-from .src.standalone.fedavg_api import FedAvgAPI
-
 # from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 # from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
 # from fedml_api.data_preprocessing.fed_cifar100.data_loader import load_partition_data_federated_cifar100
@@ -54,78 +52,6 @@ from .src.standalone.fedavg_api import FedAvgAPI
 # from fedml_api.standalone.fedavg.my_model_trainer_tag_prediction import MyModelTrainer as MyModelTrainerTAG
 
 # from fedml_api.data_preprocessing.our_celeba.data_loader import load_partition_data_celeba
-
-# config = json.load(open('config.json', 'r'))
-
-
-def add_args(parser):
-    """
-    parser : argparse.ArgumentParser
-    return a parser added with args required by fit
-    """
-    # Training settings
-    parser.add_argument('--model', type=str, default=config["model"], metavar='N',
-                        help='neural network used in training')
-
-    parser.add_argument('--dataset', type=str, default=config["dataset"], metavar='N',
-                        help='dataset used for training')
-
-    if config["dataset"] == "mnist":
-        parser.add_argument('--data_dir', type=str, default='./data/mnist',
-                            help='data directory')
-    elif config["dataset"] == "cifar10":
-        parser.add_argument('--data_dir', type=str, default='./data/cifar10',
-                            help='data directory')
-    elif config["dataset"] == "shakespeare":
-        parser.add_argument('--data_dir', type=str, default='./data/shakespeare',
-                            help='data directory')
-    else:
-        parser.add_argument('--data_dir', type=str, default='../data/'+config["dataset"],
-                            help='data directory')
-
-    parser.add_argument('--partition_method', type=str, default='hetero', metavar='N',
-                        help='how to partition the dataset on local workers')
-
-    parser.add_argument('--partition_alpha', type=float, default=0.5, metavar='PA',
-                        help='partition alpha (default: 0.5)')
-
-    parser.add_argument('--batch_size', type=int, default=config["training_param"]["batch_size"], metavar='N',
-                        help='input batch size for training (default: 64)')
-
-    parser.add_argument('--client_optimizer', type=str, default=config["training_param"]["optimizer"],
-                        help='SGD with momentum; adam')
-
-    parser.add_argument('--lr', type=float, default=config["training_param"]["learning_rate"], metavar='LR',
-                        help='learning rate (default: 0.001)')
-
-    parser.add_argument('--wd', help='weight decay parameter;', type=float,
-                        default=config["training_param"]["optimizer_param"]["weight_decay"])
-
-    parser.add_argument('--epochs', type=int, default=config["training_param"]["inner_step"], metavar='EP',
-                        help='how many epochs will be trained locally')
-
-    parser.add_argument('--client_num_in_total', type=int, default=config['training_param'].get('tot_client_num', 2), metavar='NN',
-                        help='number of workers in a distributed cluster')
-
-    parser.add_argument('--client_num_per_round', type=int, default=config["training_param"]["client_per_round"], metavar='NN',
-                        help='number of workers')
-
-    parser.add_argument('--comm_round', type=int, default=config["training_param"]["epochs"],
-                        help='how many round of communications we shoud use')
-
-    parser.add_argument('--frequency_of_the_test', type=int, default=1,
-                        help='the frequency of the algorithms')
-
-    parser.add_argument('--gpu', type=int, default=0,
-                        help='gpu')
-
-    parser.add_argument('--ci', type=int, default=0,
-                        help='CI')
-
-    parser.add_argument('--optim_param', type=dict,
-                        default=config["training_param"]["optimizer_param"])
-
-    return parser
 
 
 def load_data(config, dataset_name):
@@ -443,26 +369,3 @@ def custom_model_trainer(config, model):
         return RegressionTrainer(model)
     else:  # default model trainer is for classification problem
         return ClassificationTrainer(model)
-
-
-if __name__ == "__main__":
-    logging.basicConfig()
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-
-    parser = add_args(argparse.ArgumentParser(description='FedAvg-standalone'))
-    args = parser.parse_args()
-    logger.info(args)
-    device = torch.device("cuda:" + str(args.gpu)
-                          if torch.cuda.is_available() else "cpu")
-    logger.info(device)
-
-    dataset = load_data(args, args.dataset)
-
-    model = create_model(args, model_name=args.model, output_dim=dataset[7])
-    model_trainer = custom_model_trainer(args, model)
-    logging.info(model)
-
-    fedavgAPI = FedAvgAPI(dataset, device, args, model_trainer, is_regression=(
-        args.dataset == 'student_horizontal'))
-    fedavgAPI.train()
