@@ -1,13 +1,16 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
-name: Python package
+name: CoLink UniFed FedML
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -27,11 +30,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Install package locally
-      run: |
         pip install .
+        pip install grpcio grpcio-tools
+        pip install flake8 pytest
+        pip install fedml==0.8.2
+        pip install coincurve==18.0.0
     - name: Test with pytest
       run: |
         pytest
