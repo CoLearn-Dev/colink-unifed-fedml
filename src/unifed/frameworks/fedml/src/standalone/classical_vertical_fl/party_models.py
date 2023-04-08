@@ -2,15 +2,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from fedml.model.finance.vfl_models_standalone import DenseModel
-
 
 def sigmoid(x):
     return 1.0 / (1.0 + np.exp(-x))
 
 
 class VFLGuestModel(object):
-
     def __init__(self, local_model):
         super(VFLGuestModel, self).__init__()
         self.localModel = local_model
@@ -18,7 +15,6 @@ class VFLGuestModel(object):
         self.is_debug = False
 
         self.classifier_criterion = nn.BCEWithLogitsLoss()
-        self.dense_model = DenseModel(input_dim=self.feature_dim, output_dim=1, bias=True)
         self.parties_grad_component_list = []
         self.current_global_step = None
         self.X = None
@@ -46,9 +42,14 @@ class VFLGuestModel(object):
             U = U + comp
         return sigmoid(np.sum(U, axis=1))
 
-    def receive_components(self, component_list):
-        for party_component in component_list:
-            self.parties_grad_component_list.append(party_component)
+    def receive_components(self, component_list, logger):
+        with logger.communication(target_id=0) as c:
+            for party_component in component_list:
+                c.report_metric(
+                    'byte',
+                    party_component.size * party_component.itemsize
+                )
+                self.parties_grad_component_list.append(party_component)
 
     def fit(self):
         self._fit(self.X, self.y)
@@ -79,14 +80,12 @@ class VFLGuestModel(object):
 
 
 class VFLHostModel(object):
-
     def __init__(self, local_model):
         super(VFLHostModel, self).__init__()
         self.localModel = local_model
         self.feature_dim = local_model.get_output_dim()
         self.is_debug = False
 
-        self.dense_model = DenseModel(input_dim=self.feature_dim, output_dim=1, bias=False)
         self.common_grad = None
         self.partial_common_grad = None
         self.current_global_step = None
@@ -99,21 +98,29 @@ class VFLHostModel(object):
         self.X = X
         self.current_global_step = global_step
 
-    def _forward_computation(self, X):
-        self.A_Z = self.localModel.forward(X)
-        A_U = self.dense_model.forward(self.A_Z)
+    def _forward_computation(self, X, logger):
+        if logger is None:
+            self.A_Z = self.localModel.forward(X)
+            A_U = self.dense_model.forward(self.A_Z)
+        else:
+            with logger.computation() as c:
+                self.A_Z = self.localModel.forward(X)
+                A_U = self.dense_model.forward(self.A_Z)
         return A_U
 
     def _fit(self, X, y):
         back_grad = self.dense_model.backward(self.A_Z, self.common_grad)
         self.localModel.backward(X, back_grad)
 
-    def receive_gradients(self, gradients):
-        self.common_grad = gradients
-        self._fit(self.X, None)
+    def receive_gradients(self, gradients, logger0, logger1):
+        with logger0.communication(target_id=1) as c:
+            self.common_grad = gradients
+            c.report_metric('byte', gradients.size * gradients.itemsize)
+        with logger1.computation() as c:
+            self._fit(self.X, None)
 
-    def send_components(self):
-        return self._forward_computation(self.X)
+    def send_components(self, logger):
+        return self._forward_computation(self.X, logger)
 
     def predict(self, X):
-        return self._forward_computation(X)
+        return self._forward_computation(X, None)

@@ -1,21 +1,23 @@
 import copy
 import logging
 import random
+from time import sleep, time
 
-import numpy as np
-import torch
-
-from time import time
-from time import sleep
 import flbenchmark.logging
-
-from .client import Client
-import json
+import torch
+from fedml.simulation.sp import fedavg
 from sklearn.metrics import roc_auc_score
 
+from .client import Client
 
-AUC = ['breast_horizontal', 'default_credit_horizontal', 'give_credit_horizontal',
-       'breast_vertical', 'default_credit_vertical', 'give_credit_vertical', ]
+AUC = [
+    'breast_horizontal',
+    'default_credit_horizontal',
+    'give_credit_horizontal',
+    'breast_vertical',
+    'default_credit_vertical',
+    'give_credit_vertical',
+]
 
 
 def getbyte(w):
@@ -25,12 +27,21 @@ def getbyte(w):
     return ret
 
 
-class FedAvgAPI(object):
+class FedAvgAPI(fedavg.FedAvgAPI):
     def __init__(self, dataset, device, config, model_trainer, is_regression):
         self.device = device
         self.config = config
-        [train_data_num, test_data_num, train_data_global, test_data_global,
-         train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num] = dataset
+        [
+            train_data_num,
+            test_data_num,
+            train_data_global,
+            test_data_global,
+            train_data_local_num_dict,
+            train_data_local_dict,
+            test_data_local_dict,
+            class_num,
+        ] = dataset
+
         self.train_global = train_data_global
         self.test_global = test_data_global
         self.val_global = None
@@ -45,8 +56,13 @@ class FedAvgAPI(object):
         self.is_regression = is_regression
 
         self.model_trainer = model_trainer
-        self._setup_clients(train_data_local_num_dict,
-                            train_data_local_dict, test_data_local_dict, model_trainer)
+
+        self._setup_clients(
+            train_data_local_num_dict,
+            train_data_local_dict,
+            test_data_local_dict,
+            self.model_trainer,
+        )
 
     def _setup_clients(self, train_data_local_num_dict, train_data_local_dict, test_data_local_dict, model_trainer):
         logging.info("############setup_clients (START)#############")
@@ -56,10 +72,9 @@ class FedAvgAPI(object):
             self.client_list.append(c)
         logging.info("############setup_clients (END)#############")
 
-    def train(self, config):
+    def train(self):
         communication_time, communication_bytes = 0, 0
         report_my = 0
-        # config = json.load(open('config.json', 'r'))
 
         w_global = self.model_trainer.get_model_params()
         with flbenchmark.logging.BasicLogger(id=0, agent_type='aggregator') as logger:
@@ -71,7 +86,7 @@ class FedAvgAPI(object):
                 for round_idx in range(self.config['training']['epochs']):
                     with logger.training_round() as tr:
                         tr.report_metric(
-                            'client_num', config["training"]["client_per_round"])
+                            'client_num', self.config["training"]["client_per_round"])
                         logging.info(
                             "################Communication round : {}".format(round_idx))
 
@@ -161,19 +176,6 @@ class FedAvgAPI(object):
                 else:
                     e.report_metric('accuracy', report_my)
 
-    def _client_sampling(self, round_idx, client_num_in_total, client_num_per_round):
-        if client_num_in_total == client_num_per_round:
-            client_indexes = [
-                client_index for client_index in range(client_num_in_total)]
-        else:
-            num_clients = min(client_num_per_round, client_num_in_total)
-            # make sure for each comparison, we are selecting the same clients each round
-            np.random.seed(round_idx)
-            client_indexes = np.random.choice(
-                range(client_num_in_total), num_clients, replace=False)
-        logging.info("client_indexes = %s" % str(client_indexes))
-        return client_indexes
-
     def _generate_validation_set(self, num_samples=10000):
         test_data_num = len(self.test_global.dataset)
         sample_indices = random.sample(
@@ -183,38 +185,6 @@ class FedAvgAPI(object):
         sample_testset = torch.utils.data.DataLoader(
             subset, batch_size=self.config['training']['batch_size'])
         self.val_global = sample_testset
-
-    def _aggregate(self, w_locals):
-        training_num = 0
-        for idx in range(len(w_locals)):
-            (sample_num, averaged_params) = w_locals[idx]
-            training_num += sample_num
-
-        (sample_num, averaged_params) = w_locals[0]
-        for k in averaged_params.keys():
-            for i in range(0, len(w_locals)):
-                local_sample_number, local_model_params = w_locals[i]
-                w = local_sample_number / training_num
-                if i == 0:
-                    averaged_params[k] = local_model_params[k] * w
-                else:
-                    averaged_params[k] += local_model_params[k] * w
-        return averaged_params
-
-    def _aggregate_noniid_avg(self, w_locals):
-        '''
-        The old aggregate method will impact the model performance when it comes to Non-IID setting
-        Args:
-            w_locals:
-        Returns:
-        '''
-        (_, averaged_params) = w_locals[0]
-        for k in averaged_params.keys():
-            temp_w = []
-            for (_, local_w) in w_locals:
-                temp_w.append(local_w[k])
-            averaged_params[k] = sum(temp_w) / len(temp_w)
-        return averaged_params
 
     def _local_test_on_all_clients(self, round_idx):
 

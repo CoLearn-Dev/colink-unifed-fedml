@@ -6,7 +6,6 @@ import pytest
 import colink as CL
 
 
-
 def simulate_with_config(config_file_path):
     from unifed.frameworks.fedml.protocol import pop, UNIFED_TASK_DIR
     case_name = config_file_path.split("/")[-1].split(".")[0]

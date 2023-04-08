@@ -1,7 +1,4 @@
-import sys
-
 from unifed.frameworks.fedml import protocol
-from unifed.frameworks.fedml.workload_sim import *
 
 
 def run_protocol():

@@ -11,7 +11,7 @@ import pandas as pd
 #     '''parses data in given train and test data directories
 
 #     assumes:
-#     - the data in the input directories are .json files with 
+#     - the data in the input directories are .json files with
 #         keys 'users' and 'user_data'
 #     - the set of train set users is the same as the set of test set users
 
@@ -50,28 +50,32 @@ import pandas as pd
 #     return clients, groups, train_data, test_data
 
 def read_data(train_data_dir, test_data_dir):
-    clients = ['guest','host']
+    clients = ['guest', 'host']
     groups = []
-    train_data,test_data = {'host':{},'guest':{}},{'host':{},'guest':{}}
-    
+    train_data, test_data = {'host': {}, 'guest': {}}, {
+        'host': {}, 'guest': {}}
+
     train_files = os.listdir(train_data_dir)
     train_files = [f for f in train_files if f.endswith('.csv')]
     for f in train_files:
         file_path = os.path.join(train_data_dir, f)
         my_numpy = np.array(pd.read_csv(file_path))
-        if not (file_path[-9] == 'g') :
-            train_data['host']['x'],train_data['host']['y'] = my_numpy[:,2:],my_numpy[:,1]
+        if not (file_path[-9] == 'g'):
+            train_data['host']['x'], train_data['host']['y'] = my_numpy[:,
+                                                                        2:], my_numpy[:, 1]
         else:
-            train_data['guest']['x'],train_data['guest']['y'] = my_numpy[:,2:],my_numpy[:,1]
-    
+            train_data['guest']['x'], train_data['guest']['y'] = my_numpy[:,
+                                                                          2:], my_numpy[:, 1]
+
     test_files = os.listdir(test_data_dir)
     test_files = [f for f in test_files if f.endswith('.csv')]
     for f in test_files:
         file_path = os.path.join(test_data_dir, f)
         my_numpy = np.array(pd.read_csv(file_path))
-        test_data['host']['x'],test_data['host']['y'] = test_data['guest']['x'],test_data['guest']['y'] = my_numpy[:,2:],my_numpy[:,1]
+        test_data['host']['x'], test_data['host']['y'] = test_data['guest']['x'], test_data['guest']['y'] = my_numpy[:, 2:], my_numpy[:, 1]
 
     return clients, groups, train_data, test_data
+
 
 def batch_data(data, batch_size):
     '''
@@ -109,8 +113,8 @@ def batch_data(data, batch_size):
 
 
 def load_partition_data_default_credit_horizontal(batch_size,
-                              train_path="../csv_data/default_credit_horizontal_train/",
-                              test_path="../csv_data/default_credit_horizontal_test/"):
+                                                  train_path="data/default_credit_horizontal_train/",
+                                                  test_path="data/default_credit_horizontal_test/"):
     users, groups, train_data, test_data = read_data(train_path, test_path)
     print(train_data['host'].keys())
 
@@ -144,9 +148,9 @@ def load_partition_data_default_credit_horizontal(batch_size,
         client_idx += 1
     logging.info("finished the loading data")
     client_num = client_idx
-    class_num = 2 # to update the number of classes
+    class_num = 2  # to update the number of classes
 
     return client_num, train_data_num, test_data_num, train_data_global, test_data_global, \
-           train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num
+        train_data_local_num_dict, train_data_local_dict, test_data_local_dict, class_num
 
 # print(load_partition_data_default_credit_horizontal(16))
