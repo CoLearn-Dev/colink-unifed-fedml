@@ -1,10 +1,16 @@
 import json
 from typing import List
+import argparse
+import os
 
+import yaml
 import colink as CL
 import flbenchmark.datasets
 import torch
 from sklearn.utils import shuffle
+import fedml
+from fedml import FedMLRunner
+from fedml.arguments import Arguments
 
 from unifed.frameworks.fedml.util import (GetTempFileName, get_local_ip,
                                           store_error, store_return)
@@ -14,6 +20,7 @@ from .horizontal_exp import load_data as load_data_horizontal
 from .src.standalone.fedavg_api import FedAvgAPI
 from .vertical_exp import load_data as load_data_vertical
 from .vertical_exp import run_experiment
+
 
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
@@ -140,6 +147,84 @@ def run_simulation(config):
         raise Exception("Not handling this mode yet!")
 
 
+def add_args(cf, rank, role):
+    cmd_args = argparse.Namespace()
+    cmd_args.yaml_config_file = cf
+    cmd_args.rank = rank
+    cmd_args.role = role
+    cmd_args.local_rank = 0
+    cmd_args.node_rank = 0
+    cmd_args.run_id = "0"
+    return cmd_args
+
+
+def load_arguments(cf, rank, role, training_type=None, comm_backend=None):
+    cmd_args = add_args(cf, rank, role)
+
+    # Load all arguments from YAML config file
+    args = Arguments(cmd_args, training_type, comm_backend)
+
+    if not hasattr(args, "worker_num"):
+        args.worker_num = args.client_num_per_round
+
+    # os.path.expanduser() method in Python is used
+    # to expand an initial path component ~( tilde symbol)
+    # or ~user in the given path to user’s home directory.
+    if hasattr(args, "data_cache_dir"):
+        args.data_cache_dir = os.path.expanduser(args.data_cache_dir)
+    if hasattr(args, "data_file_path"):
+        args.data_file_path = os.path.expanduser(args.data_file_path)
+    if hasattr(args, "partition_file_path"):
+        args.partition_file_path = os.path.expanduser(args.partition_file_path)
+    if hasattr(args, "part_file"):
+        args.part_file = os.path.expanduser(args.part_file)
+
+    args.rank = int(args.rank)
+    return args
+
+
+def run_fedml(rank, role, config):
+    with open('src/unifed/frameworks/fedml/config/fedml_config.yaml', 'r') as f:
+        try:
+            fedml_config = yaml.safe_load(f)
+        except yaml.YAMLError as exc:
+            raise Exception(exc.message)
+
+    fedml_config['data_args']['dataset'] = config['dataset']
+    fedml_config['model_args']['model'] = config['model']
+    fedml_config['train_args']['client_num_in_total'] = config['training']['tot_client_num']
+    fedml_config['train_args']['client_num_per_round'] = config['training']['client_per_round']
+    fedml_config['train_args']['comm_round'] = config['training']['epochs']
+    fedml_config['train_args']['epochs'] = config['training']['inner_step']
+    fedml_config['train_args']['batch_size'] = config['training']['batch_size']
+    fedml_config['train_args']['client_optimizer'] = config['training']['optimizer']
+    fedml_config['train_args']['learning_rate'] = config['training']['learning_rate']
+    fedml_config['train_args']['weight_decay'] = config['training']['optimizer_param']['weight_decay']
+
+    with GetTempFileName() as temp_filename:
+        with open(temp_filename, 'w') as f:
+            f.write(yaml.dump(fedml_config))
+        args = fedml.init(load_arguments(temp_filename, rank, role))
+
+    # init device
+    device = fedml.device.get_device(args)
+
+    # load data
+    download_data(config)
+    dataset = load_data_horizontal(config['training'], config['dataset'])
+
+    # load model
+    model = create_model(
+        config,
+        model_name=config['model'],
+        output_dim=dataset[7],
+    )
+
+    # start training
+    fedml_runner = FedMLRunner(args, device, dataset, model)
+    fedml_runner.run()
+
+
 @pop.handle("unifed.fedml:server")
 @store_error(UNIFED_TASK_DIR)
 @store_return(UNIFED_TASK_DIR)
@@ -159,16 +244,16 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # Load configuration and setup server
     config = load_config_from_param_and_check(param)
 
-    # Prepare data
-    download_data(config)
+    # # Run simulation
+    # run_simulation(config)
 
-    # Run simulation
-    run_simulation(config)
+    # Run server
+    run_fedml(0, 'server', config)
 
     # Write output and log
-    output, log = write_file(participant_id)
-    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
-    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
+    # output, log = write_file(participant_id)
+    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
+    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
 
     return json.dumps({
         "server_ip": server_ip,
@@ -195,12 +280,12 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     config = load_config_from_param_and_check(param)
 
     # Prepare data
-    download_data(config)
+    run_fedml(participant_id, 'client', config)
 
     # Write output and log
-    output, log = write_file(participant_id)
-    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
-    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
+    # output, log = write_file(participant_id)
+    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
+    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
 
     return json.dumps({
         "server_ip": server_ip,
