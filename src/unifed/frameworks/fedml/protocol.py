@@ -183,7 +183,7 @@ def load_arguments(cf, rank, role, training_type=None, comm_backend=None):
     return args
 
 
-def run_fedml(rank, role, config):
+def config_fedml(config, rank, role):
     with open('src/unifed/frameworks/fedml/config/fedml_config.yaml', 'r') as f:
         try:
             fedml_config = yaml.safe_load(f)
@@ -205,7 +205,10 @@ def run_fedml(rank, role, config):
         with open(temp_filename, 'w') as f:
             f.write(yaml.dump(fedml_config))
         args = fedml.init(load_arguments(temp_filename, rank, role))
+    return args
 
+
+def run_fedml(config, args):
     # init device
     device = fedml.device.get_device(args)
 
@@ -219,6 +222,9 @@ def run_fedml(rank, role, config):
         model_name=config['model'],
         output_dim=dataset[7],
     )
+
+    # load model trainer
+    # model_trainer = custom_model_trainer(config, model)
 
     # start training
     fedml_runner = FedMLRunner(args, device, dataset, model)
@@ -248,7 +254,8 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # run_simulation(config)
 
     # Run server
-    run_fedml(0, 'server', config)
+    args = config_fedml(config, 0, 'server')
+    run_fedml(config, args)
 
     # Write output and log
     # output, log = write_file(participant_id)
@@ -279,8 +286,9 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # Load configuration and setup server
     config = load_config_from_param_and_check(param)
 
-    # Prepare data
-    run_fedml(participant_id, 'client', config)
+    # Run
+    args = config_fedml(config, participant_id, 'client')
+    run_fedml(config, args)
 
     # Write output and log
     # output, log = write_file(participant_id)

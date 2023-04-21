@@ -39,6 +39,6 @@ comm_args:
   grpc_ipconfig_path: src/unifed/frameworks/fedml/config/grpc_ipconfig.csv
 
 tracking_args:
-  enable_wandb: false
+  enable_wandb: true
   wandb_project: fedml
   wandb_name: fedml_torch_fedavg
