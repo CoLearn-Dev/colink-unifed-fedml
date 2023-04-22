@@ -1,20 +1,12 @@
 import torch
 from torch import nn
-import flbenchmark.logging
-from fedml.core.alg_frame.client_trainer import ClientTrainer
 
 
-class ClassificationTrainer(ClientTrainer):
-    def __init__(self, model, args):
-        self.logger = \
-            flbenchmark.logging.BasicLogger(
-                id=args.rank,
-                agent_type='client',
-            )
-        super().__init__(model, args)
-
-    def end(self):
-        self.logger.end()
+class ClassificationTrainer():
+    def __init__(self, model, config=None):
+        self.model = model
+        self.id = 0
+        self.config = config
 
     def get_model_params(self):
         return self.model.cpu().state_dict()
@@ -22,32 +14,25 @@ class ClassificationTrainer(ClientTrainer):
     def set_model_params(self, model_parameters):
         self.model.load_state_dict(model_parameters)
 
-    def train(self, train_data, device, args):
+    def train(self, train_data, device, config, logger):
         model = self.model
 
         model.to(device)
         model.train()
 
         # train and update
-        criterion = nn.CrossEntropyLoss().to(device)  # pylint: disable=E1102
-        if args.client_optimizer == "sgd":
-            optimizer = torch.optim.SGD(
-                filter(lambda p: p.requires_grad, self.model.parameters()),
-                lr=args.learning_rate,
-            )
+        criterion = nn.CrossEntropyLoss().to(device)
+        optim_param = config['optimizer_param']
+        if config['optimizer'] == "sgd":
+            optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters(
+            )), lr=config['learning_rate'], momentum=optim_param['momentum'], weight_decay=optim_param['weight_decay'], dampening=optim_param['dampening'], nesterov=optim_param['nesterov'])
         else:
-            optimizer = torch.optim.Adam(
-                filter(lambda p: p.requires_grad, self.model.parameters()),
-                lr=args.learning_rate,
-                weight_decay=args.weight_decay,
-                amsgrad=True,
-            )
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=config['learning_rate'],
+                                         weight_decay=optim_param['weight_decay'], amsgrad=True)
 
-        self.logger.training_start()
         epoch_loss = []
-        for epoch in range(args.epochs):
-            self.logger.training_round_start()
-            with self.logger.computation() as c:
+        for epoch in range(config['epochs']):
+            with logger.computation() as c:
                 batch_loss = []
                 for batch_idx, (x, labels) in enumerate(train_data):
                     x, labels = x.to(device), labels.to(device)
@@ -60,8 +45,6 @@ class ClassificationTrainer(ClientTrainer):
                     batch_loss.append(loss.item())
                 epoch_loss.append(sum(batch_loss) / len(batch_loss))
                 c.report_metric('loss', sum(epoch_loss) / len(epoch_loss))
-            self.logger.training_round_end()
-        self.logger.training_end()
 
     def test(self, test_data, device, args):
         model = self.model
@@ -104,3 +87,6 @@ class ClassificationTrainer(ClientTrainer):
                     metrics['targety'] = torch.cat(
                         (metrics['targety'], target.reshape(-1)))
         return metrics
+
+    def test_on_the_server(self, train_data_local_dict, test_data_local_dict, device, args=None) -> bool:
+        return False

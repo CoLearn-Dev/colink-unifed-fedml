@@ -21,6 +21,9 @@ from .src.standalone.fedavg_api import FedAvgAPI
 from .vertical_exp import load_data as load_data_vertical
 from .vertical_exp import run_experiment
 
+from .src.trainer.classification_trainer import ClassificationTrainer
+from .src.aggregator.default_aggregator import UniFedServerAggregator
+
 
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
@@ -209,6 +212,26 @@ def config_fedml(config, rank, role):
 
 
 def run_fedml(config, args):
+    def custom_client_trainer(model, args):
+        if args.dataset == "stackoverflow_logistic_regression":
+            trainer = MyModelTrainerTAG(model, args)
+        elif args.dataset in ["fed_shakespeare", "stackoverflow_nwp", "reddit"]:
+            trainer = NWPTrainer(model, args)
+        elif args.dataset in ['student_horizontal']:
+            trainer = RegressionTrainer(model, args)
+        else:
+            trainer = ClassificationTrainer(model, args)
+        return trainer
+
+    def custom_server_aggregator(model, args):
+        if args.dataset == "stackoverflow_lr":
+            aggregator = MyServerAggregatorTAGPred(model, args)
+        elif args.dataset in ["fed_shakespeare", "stackoverflow_nwp"]:
+            aggregator = MyServerAggregatorNWP(model, args)
+        else:
+            aggregator = UniFedServerAggregator(model, args)
+        return aggregator
+
     # init device
     device = fedml.device.get_device(args)
 
@@ -223,12 +246,20 @@ def run_fedml(config, args):
         output_dim=dataset[7],
     )
 
-    # load model trainer
-    # model_trainer = custom_model_trainer(config, model)
-
-    # start training
-    fedml_runner = FedMLRunner(args, device, dataset, model)
-    fedml_runner.run()
+    if args.role == "client":
+        trainer = custom_client_trainer(model, args)
+        fedml_runner = FedMLRunner(
+            args, device, dataset, model,
+            client_trainer=trainer)
+        fedml_runner.run()
+        trainer.end()
+    elif args.role == "server":
+        aggregator = custom_server_aggregator(model, args)
+        fedml_runner = FedMLRunner(
+            args, device, dataset, model,
+            server_aggregator=aggregator)
+        fedml_runner.run()
+        aggregator.end()
 
 
 @pop.handle("unifed.fedml:server")

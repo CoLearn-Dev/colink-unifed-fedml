@@ -29,16 +29,17 @@ validation_args:
   frequency_of_the_test: 1
 
 device_args:
-  worker_num: 1
+  worker_num: 2
   using_gpu: false
-  gpu_mapping_file: config/gpu_mapping.yaml
+  gpu_mapping_file: src/unifed/frameworks/fedml/config/gpu_mapping.yaml
   gpu_mapping_key: mapping_default
 
 comm_args:
+  # backend: "MQTT_S3"
   backend: "GRPC"
   grpc_ipconfig_path: src/unifed/frameworks/fedml/config/grpc_ipconfig.csv
 
 tracking_args:
-  enable_wandb: true
+  enable_wandb: false
   wandb_project: fedml
   wandb_name: fedml_torch_fedavg

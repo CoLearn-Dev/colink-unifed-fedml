@@ -27,9 +27,9 @@ from fedml.model.linear.lr import LogisticRegression
 from fedml.model.cv.resnet import resnet56
 from fedml.model.nlp.rnn import RNN_StackOverFlow
 
-from .src.trainer.classification_trainer import ClassificationTrainer
-from .src.trainer.nwp_trainer import NWPTrainer
-from .src.trainer.regression_trainer import RegressionTrainer
+from .src.simulation_trainer.classification_trainer import ClassificationTrainer
+from .src.simulation_trainer.nwp_trainer import NWPTrainer
+from .src.simulation_trainer.regression_trainer import RegressionTrainer
 
 # from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 # from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
