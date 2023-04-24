@@ -1,14 +1,15 @@
-from .src.standalone.classical_vertical_fl.party_models import (
-    VFLGuestModel, VFLHostModel)
-from .src.standalone.classical_vertical_fl.vfl import \
-    VerticalMultiplePartyLogisticRegressionFederatedLearning
-from .src.standalone.classical_vertical_fl.vfl_fixture import \
-    FederatedLearningFixture
+from sklearn.utils import shuffle
 
 from .src.data.preprocessing_data import (breast_load_two_party_data,
                                           default_credit_load_two_party_data,
                                           give_credit_load_two_party_data)
 from .src.model.finance.vfl_models_standalone import DenseModel, LocalModel
+from .src.standalone.classical_vertical_fl.party_models import (VFLGuestModel,
+                                                                VFLHostModel)
+from .src.standalone.classical_vertical_fl.vfl import \
+    VerticalMultiplePartyLogisticRegressionFederatedLearning
+from .src.standalone.classical_vertical_fl.vfl_fixture import \
+    FederatedLearningFixture
 
 # from fedml_api.data_preprocessing.preprocessing_data import dvisits_load_two_party_data, motor_load_two_party_data, vehicle_scale_load_two_party_data
 
@@ -93,3 +94,22 @@ def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, conf
     print(epoch, batch_size)
     fl_fixture.fit(train_data=train_data, test_data=test_data,
                    epochs=epoch, batch_size=batch_size)
+
+
+def run_simulation_vertical(config):
+    train, test = load_data(config['dataset'])
+    Xa_train, Xb_train, y_train = train
+    Xa_test, Xb_test, y_test = test
+
+    Xa_train, Xb_train, y_train = shuffle(Xa_train, Xb_train, y_train)
+    Xa_test, Xb_test, y_test = shuffle(Xa_test, Xb_test, y_test)
+    train = [Xa_train, Xb_train, y_train]
+    test = [Xa_test, Xb_test, y_test]
+    run_experiment(
+        train_data=train,
+        test_data=test,
+        batch_size=config['training']['batch_size'],
+        learning_rate=config['training']['learning_rate'],
+        epoch=config['training']['epochs'],
+        config=config,
+    )

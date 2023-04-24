@@ -10,18 +10,16 @@ import torch
 import yaml
 from fedml import FedMLRunner
 from fedml.arguments import Arguments
-from sklearn.utils import shuffle
 
 from unifed.frameworks.fedml.util import (GetTempFileName, get_local_ip,
                                           store_error, store_return)
 
-from .horizontal_exp import create_model, custom_model_trainer
+from .horizontal_exp import create_model
 from .horizontal_exp import load_data as load_data_horizontal
+from .horizontal_exp import run_simulation_horizontal
 from .src.aggregator.default_aggregator import UniFedServerAggregator
-from .src.standalone.fedavg_api import FedAvgAPI
 from .src.trainer.classification_trainer import ClassificationTrainer
-from .vertical_exp import load_data as load_data_vertical
-from .vertical_exp import run_experiment
+from .vertical_exp import run_simulation_vertical
 
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
@@ -107,43 +105,10 @@ def write_file(participant_id):
 
 
 def run_simulation(config):
-    device = torch.device(
-        "cuda:" + str(config.get('gpu', 0))
-        if torch.cuda.is_available()
-        else "cpu"
-    )
-
     if config['dataset'].split('_')[-1] == 'horizontal':
-        dataset = load_data_horizontal(config['training'], config['dataset'])
-        model = create_model(
-            config, model_name=config['model'], output_dim=dataset[7])
-        model_trainer = custom_model_trainer(config, model)
-
-        fedavgAPI = FedAvgAPI(
-            dataset,
-            device,
-            config,
-            model_trainer,
-            is_regression=(config['dataset'] == 'student_horizontal')
-        )
-        fedavgAPI.train()
+        run_simulation_horizontal(config)
     elif config['dataset'].split('_')[-1] == 'vertical':
-        train, test = load_data_vertical(config['dataset'])
-        Xa_train, Xb_train, y_train = train
-        Xa_test, Xb_test, y_test = test
-
-        Xa_train, Xb_train, y_train = shuffle(Xa_train, Xb_train, y_train)
-        Xa_test, Xb_test, y_test = shuffle(Xa_test, Xb_test, y_test)
-        train = [Xa_train, Xb_train, y_train]
-        test = [Xa_test, Xb_test, y_test]
-        run_experiment(
-            train_data=train,
-            test_data=test,
-            batch_size=config['training']['batch_size'],
-            learning_rate=config['training']['learning_rate'],
-            epoch=config['training']['epochs'],
-            config=config,
-        )
+        run_simulation_vertical(config)
     else:
         raise Exception("Not handling this mode yet!")
 

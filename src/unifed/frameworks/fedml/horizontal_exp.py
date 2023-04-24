@@ -1,35 +1,38 @@
-import argparse
 import logging
-import json
 import os
 
 import numpy as np
 import torch
-
-from .src.data.breast_horizontal.data_loader import load_partition_data_breast_horizontal
-from .src.data.default_credit_horizontal.data_loader import load_partition_data_default_credit_horizontal
-from .src.data.our_femnist.data_loader import load_partition_data_femnist
-from .src.data.give_credit_horizontal.data_loader import load_partition_data_give_credit_horizontal
-from .src.data.our_reddit.data_loader import load_partition_data_reddit
-from .src.data.student_horizontal.data_loader import load_partition_data_student_horizontal
-from .src.data.vehicle_scale_horizontal.data_loader import load_partition_data_vehicle_scale_horizontal
 from fedml.data.cifar10.data_loader import load_partition_data_cifar10
-from fedml.data.MNIST.data_loader import download_mnist, load_partition_data_mnist
-
+from fedml.data.MNIST.data_loader import (download_mnist,
+                                          load_partition_data_mnist)
 # TODO: download shakespeare?
 # from fedml.data.fed_shakespeare.data_loader import load_partition_data_federated_shakespeare
 from fedml.data.shakespeare.data_loader import load_partition_data_shakespeare
-
-from .src.model.non_linear.mlp import MLP
-from .src.model.cv.lenet import lenet
-from .src.model.linear.lr import LinearRegression
-from fedml.model.linear.lr import LogisticRegression
 from fedml.model.cv.resnet import resnet56
+from fedml.model.linear.lr import LogisticRegression
 from fedml.model.nlp.rnn import RNN_StackOverFlow
 
-from .src.simulation_trainer.classification_trainer import ClassificationTrainer
+from .src.data.breast_horizontal.data_loader import \
+    load_partition_data_breast_horizontal
+from .src.data.default_credit_horizontal.data_loader import \
+    load_partition_data_default_credit_horizontal
+from .src.data.give_credit_horizontal.data_loader import \
+    load_partition_data_give_credit_horizontal
+from .src.data.our_femnist.data_loader import load_partition_data_femnist
+from .src.data.our_reddit.data_loader import load_partition_data_reddit
+from .src.data.student_horizontal.data_loader import \
+    load_partition_data_student_horizontal
+from .src.data.vehicle_scale_horizontal.data_loader import \
+    load_partition_data_vehicle_scale_horizontal
+from .src.model.cv.lenet import lenet
+from .src.model.linear.lr import LinearRegression
+from .src.model.non_linear.mlp import MLP
+from .src.simulation_trainer.classification_trainer import \
+    ClassificationTrainer
 from .src.simulation_trainer.nwp_trainer import NWPTrainer
 from .src.simulation_trainer.regression_trainer import RegressionTrainer
+from .src.standalone.fedavg_api import FedAvgAPI
 
 # from fedml_api.data_preprocessing.cifar100.data_loader import load_partition_data_cifar100
 # from fedml_api.data_preprocessing.cinic10.data_loader import load_partition_data_cinic10
@@ -369,3 +372,25 @@ def custom_model_trainer(config, model):
         return RegressionTrainer(model)
     else:  # default model trainer is for classification problem
         return ClassificationTrainer(model)
+
+
+def run_simulation_horizontal(config):
+    device = torch.device(
+        "cuda:" + str(config.get('gpu', 0))
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+
+    dataset = load_data(config['training'], config['dataset'])
+    model = create_model(
+        config, model_name=config['model'], output_dim=dataset[7])
+    model_trainer = custom_model_trainer(config, model)
+
+    fedavgAPI = FedAvgAPI(
+        dataset,
+        device,
+        config,
+        model_trainer,
+        is_regression=(config['dataset'] == 'student_horizontal')
+    )
+    fedavgAPI.train()

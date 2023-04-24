@@ -1,8 +1,8 @@
 {
   "framework": "fedml",
-  "dataset": "breast_horizontal",
-  "algorithm": "fed_avg",
-  "model": "logistic_regression",
+  "algorithm": "fedavg",
+  "dataset": "default_credit_horizontal",
+  "model": "mlp_128",
   "deployment": {
     "mode": "colink",
     "participants": [
@@ -21,16 +21,18 @@
     ]
   },
   "training": {
-    "epochs": 40,
+    "epochs": 30,
+    "inner_step": 1,
     "batch_size": 32,
-    "inner_step": 5,
+    "learning_rate": 0.01,
     "client_per_round": 2,
     "tot_client_num": 2,
-    "learning_rate": 0.01,
-    "loss_func": "cross_entropy",
-    "optimizer": "adam",
+    "optimizer": "sgd",
     "optimizer_param": {
-      "weight_decay": 0
+      "momentum": 0.9,
+      "dampening": 0,
+      "weight_decay": 0,
+      "nesterov": false
     }
   }
 }

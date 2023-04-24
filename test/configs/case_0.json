@@ -1,35 +1,36 @@
 {
-    "framework": "fedml",
-    "dataset": "default_credit_vertical",
-    "algorithm": "Hetero-LR",
-    "model": "logistic_regression",
-    "deployment": {
-        "mode": "colink",
-        "participants": [
-            [
-                "0",
-                "server"
-            ],
-            [
-                "1",
-                "client"
-            ]
-        ]
-    },
-    "training": {
-        "epochs": 10,
-        "batch_size": 32,
-        "learning_rate": 0.01,
-        "loss_func": "cross_entropy",
-        "inner_step": 1,
-        "tot_client_num": 2,
-        "client_per_round": 2,
-        "optimizer": "sgd",
-        "optimizer_param": {
-            "momentum": 0.9,
-            "dampening": 0,
-            "weight_decay": 0,
-            "nesterov": false
-        }
+  "framework": "fedml",
+  "dataset": "breast_horizontal",
+  "algorithm": "fed_avg",
+  "model": "logistic_regression",
+  "deployment": {
+    "mode": "colink",
+    "participants": [
+      [
+        "0",
+        "server"
+      ],
+      [
+        "1",
+        "client"
+      ],
+      [
+        "2",
+        "client"
+      ]
+    ]
+  },
+  "training": {
+    "epochs": 1,
+    "batch_size": 32,
+    "inner_step": 2,
+    "client_per_round": 2,
+    "tot_client_num": 2,
+    "learning_rate": 0.01,
+    "loss_func": "cross_entropy",
+    "optimizer": "adam",
+    "optimizer_param": {
+      "weight_decay": 0
     }
+  }
 }
