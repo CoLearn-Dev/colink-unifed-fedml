@@ -1,29 +1,27 @@
-import json
-from typing import List
 import argparse
+import json
 import os
+from typing import List
 
-import yaml
 import colink as CL
+import fedml
 import flbenchmark.datasets
 import torch
-from sklearn.utils import shuffle
-import fedml
+import yaml
 from fedml import FedMLRunner
 from fedml.arguments import Arguments
+from sklearn.utils import shuffle
 
 from unifed.frameworks.fedml.util import (GetTempFileName, get_local_ip,
                                           store_error, store_return)
 
 from .horizontal_exp import create_model, custom_model_trainer
 from .horizontal_exp import load_data as load_data_horizontal
+from .src.aggregator.default_aggregator import UniFedServerAggregator
 from .src.standalone.fedavg_api import FedAvgAPI
+from .src.trainer.classification_trainer import ClassificationTrainer
 from .vertical_exp import load_data as load_data_vertical
 from .vertical_exp import run_experiment
-
-from .src.trainer.classification_trainer import ClassificationTrainer
-from .src.aggregator.default_aggregator import UniFedServerAggregator
-
 
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
@@ -92,9 +90,9 @@ def write_file(participant_id):
     with GetTempFileName() as temp_log_filename, \
             GetTempFileName() as temp_output_filename:
 
-        print(f"Writing to {temp_output_filename} and {temp_log_filename}...")
-        with open(temp_output_filename, 'w') as f:
-            f.write(f"Some output for {participant_id} here.")
+        # print(f"Writing to {temp_output_filename} and {temp_log_filename}...")
+        # with open(temp_output_filename, 'w') as f:
+        #     f.write(f"Some output for {participant_id} here.")
 
         with open(temp_log_filename, 'w') as f:
             with open(f"./log/{participant_id}.log", 'r') as f2:
@@ -186,12 +184,18 @@ def load_arguments(cf, rank, role, training_type=None, comm_backend=None):
     return args
 
 
-def config_fedml(config, rank, role):
+def config_fedml_client(config, rank, server_ip):
     with open('src/unifed/frameworks/fedml/config/fedml_config.yaml', 'r') as f:
         try:
             fedml_config = yaml.safe_load(f)
         except yaml.YAMLError as exc:
             raise Exception(exc.message)
+
+    ipconfig_fn = fedml_config['comm_args']['grpc_ipconfig_path'].replace(
+        '.csv', f'_{rank}.csv')
+    with open(ipconfig_fn, 'w') as f:
+        f.write('receiver_id,ip\n')
+        f.write(f'0,{server_ip}\n')
 
     fedml_config['data_args']['dataset'] = config['dataset']
     fedml_config['model_args']['model'] = config['model']
@@ -203,11 +207,49 @@ def config_fedml(config, rank, role):
     fedml_config['train_args']['client_optimizer'] = config['training']['optimizer']
     fedml_config['train_args']['learning_rate'] = config['training']['learning_rate']
     fedml_config['train_args']['weight_decay'] = config['training']['optimizer_param']['weight_decay']
+    fedml_config['comm_args']['grpc_ipconfig_path'] = ipconfig_fn
 
     with GetTempFileName() as temp_filename:
         with open(temp_filename, 'w') as f:
             f.write(yaml.dump(fedml_config))
-        args = fedml.init(load_arguments(temp_filename, rank, role))
+        args = fedml.init(load_arguments(temp_filename, rank, 'client'))
+
+    return args
+
+
+def config_fedml_server(config, rank, clients_ip):
+    with open('src/unifed/frameworks/fedml/config/fedml_config.yaml', 'r') as f:
+        try:
+            fedml_config = yaml.safe_load(f)
+        except yaml.YAMLError as exc:
+            raise Exception(exc.message)
+    print('Loaded fedml config')
+
+    ipconfig_fn = fedml_config['comm_args']['grpc_ipconfig_path'].replace(
+        '.csv', f'_{rank}.csv')
+    with open(ipconfig_fn, 'w') as f:
+        f.write('receiver_id,ip\n')
+        f.write('0,127.0.0.1\n')
+        for i, client_ip in enumerate(clients_ip):
+            f.write(f'{i+1},{client_ip}\n')
+    print('IP config file saved to', ipconfig_fn)
+
+    fedml_config['data_args']['dataset'] = config['dataset']
+    fedml_config['model_args']['model'] = config['model']
+    fedml_config['train_args']['client_num_in_total'] = config['training']['tot_client_num']
+    fedml_config['train_args']['client_num_per_round'] = config['training']['client_per_round']
+    fedml_config['train_args']['comm_round'] = config['training']['epochs']
+    fedml_config['train_args']['epochs'] = config['training']['inner_step']
+    fedml_config['train_args']['batch_size'] = config['training']['batch_size']
+    fedml_config['train_args']['client_optimizer'] = config['training']['optimizer']
+    fedml_config['train_args']['learning_rate'] = config['training']['learning_rate']
+    fedml_config['train_args']['weight_decay'] = config['training']['optimizer_param']['weight_decay']
+    fedml_config['comm_args']['grpc_ipconfig_path'] = ipconfig_fn
+
+    with GetTempFileName() as temp_filename:
+        with open(temp_filename, 'w') as f:
+            f.write(yaml.dump(fedml_config))
+        args = fedml.init(load_arguments(temp_filename, rank, 'server'))
     return args
 
 
@@ -266,6 +308,12 @@ def run_fedml(config, args):
 @store_error(UNIFED_TASK_DIR)
 @store_return(UNIFED_TASK_DIR)
 def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
+    # Get client IPs from the clients
+    clients_ip = [
+        cl.recv_variable(f'client_ip', p).decode()
+        for p in participants if p.role == 'client'
+    ]
+
     # Get server IP (current machine's IP) and send to the clients
     server_ip = get_local_ip()
     cl.send_variable(
@@ -273,6 +321,8 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         server_ip,
         [p for p in participants if p.role == "client"]
     )
+
+    # Get participant ID
     participant_id = [
         i for i, p in enumerate(participants)
         if p.user_id == cl.get_user_id()
@@ -284,14 +334,24 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # # Run simulation
     # run_simulation(config)
 
-    # Run server
-    args = config_fedml(config, 0, 'server')
+    # Configure FedML
+    print('Setup server...')
+    args = config_fedml_server(config, 0, clients_ip)
+
+    # Send notification to the clients that the server is ready
+    cl.send_variable(
+        "server_setup_done",
+        True,
+        [p for p in participants if p.role == "client"]
+    )
+
+    # Run FedML
     run_fedml(config, args)
 
     # Write output and log
-    # output, log = write_file(participant_id)
-    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
-    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
+    output, log = write_file(participant_id)
+    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
+    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
 
     return json.dumps({
         "server_ip": server_ip,
@@ -304,11 +364,21 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
 @store_error(UNIFED_TASK_DIR)
 @store_return(UNIFED_TASK_DIR)
 def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
-    # get the ip of the server
+    # Get client IP (current machine's IP) and send to the server
+    client_ip = get_local_ip()
+    cl.send_variable(
+        f'client_ip',
+        client_ip,
+        [p for p in participants if p.role == 'server']
+    )
+
+    # Get server IP from the server
     server_in_list = [p for p in participants if p.role == "server"]
     assert len(server_in_list) == 1
     p_server = server_in_list[0]
     server_ip = cl.recv_variable("server_ip", p_server).decode()
+
+    # Get participant ID
     participant_id = [
         i for i, p in enumerate(participants)
         if p.user_id == cl.get_user_id()
@@ -317,14 +387,20 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # Load configuration and setup server
     config = load_config_from_param_and_check(param)
 
-    # Run
-    args = config_fedml(config, participant_id, 'client')
+    # Receive notification from the server that the server is ready
+    print(f'[{participant_id}] Waiting for server setup...')
+    cl.recv_variable("server_setup_done", p_server).decode()
+
+    # Configure FedML
+    args = config_fedml_client(config, participant_id, server_ip)
+
+    # Run FedML
     run_fedml(config, args)
 
     # Write output and log
-    # output, log = write_file(participant_id)
-    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
-    # cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
+    output, log = write_file(participant_id)
+    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
+    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
 
     return json.dumps({
         "server_ip": server_ip,
