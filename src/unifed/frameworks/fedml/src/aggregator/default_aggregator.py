@@ -1,7 +1,6 @@
 import copy
 import logging
 
-import flbenchmark.logging
 import numpy as np
 import torch
 from sklearn.metrics import roc_auc_score
@@ -11,6 +10,8 @@ import wandb
 from fedml import mlops
 from fedml.ml.aggregator.default_aggregator import DefaultServerAggregator
 
+from ..logger import LoggerManager
+
 
 class UniFedServerAggregator(DefaultServerAggregator):
     def __init__(self, model, args):
@@ -18,14 +19,7 @@ class UniFedServerAggregator(DefaultServerAggregator):
         self.cpu_transfer = False \
             if not hasattr(self.args, "cpu_transfer") \
             else self.args.cpu_transfer
-        self.logger = \
-            flbenchmark.logging.BasicLogger(
-                id=args.rank,
-                agent_type='aggregator',
-            )
-
-    def end(self):
-        self.logger.end()
+        self.logger = LoggerManager().get_logger(0, 'aggregator')
 
     def _test(self, test_data, device, args):
         model = self.model

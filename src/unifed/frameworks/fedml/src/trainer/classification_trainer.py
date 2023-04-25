@@ -1,20 +1,14 @@
 import torch
 from torch import nn
-import flbenchmark.logging
+
 from fedml.core.alg_frame.client_trainer import ClientTrainer
+from ..logger import LoggerManager
 
 
 class ClassificationTrainer(ClientTrainer):
     def __init__(self, model, args):
-        self.logger = \
-            flbenchmark.logging.BasicLogger(
-                id=args.rank,
-                agent_type='client',
-            )
         super().__init__(model, args)
-
-    def end(self):
-        self.logger.end()
+        self.logger = LoggerManager.get_logger(args.rank, 'client')
 
     def get_model_params(self):
         return self.model.cpu().state_dict()

@@ -6,9 +6,7 @@ from typing import List
 import colink as CL
 import fedml
 import flbenchmark.datasets
-import torch
 import yaml
-from fedml import FedMLRunner
 from fedml.arguments import Arguments
 
 from unifed.frameworks.fedml.util import (GetTempFileName, get_local_ip,
@@ -20,6 +18,9 @@ from .horizontal_exp import run_simulation_horizontal
 from .src.aggregator.default_aggregator import UniFedServerAggregator
 from .src.trainer.classification_trainer import ClassificationTrainer
 from .vertical_exp import run_simulation_vertical
+from .src.fedml.runner import FedMLRunner
+# from fedml import FedMLRunner
+from .src.logger import LoggerManager
 
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
@@ -149,6 +150,14 @@ def load_arguments(cf, rank, role, training_type=None, comm_backend=None):
     return args
 
 
+def init_fedml_client(fedml_config, rank):
+    with GetTempFileName() as temp_filename:
+        with open(temp_filename, 'w') as f:
+            f.write(yaml.dump(fedml_config))
+        args = fedml.init(load_arguments(temp_filename, rank, 'client'))
+    return args
+
+
 def config_fedml_client(config, rank, server_ip):
     with open('src/unifed/frameworks/fedml/config/fedml_config.yaml', 'r') as f:
         try:
@@ -174,15 +183,18 @@ def config_fedml_client(config, rank, server_ip):
     fedml_config['train_args']['weight_decay'] = config['training']['optimizer_param']['weight_decay']
     fedml_config['comm_args']['grpc_ipconfig_path'] = ipconfig_fn
 
+    return fedml_config
+
+
+def init_fedml_server(fedml_config):
     with GetTempFileName() as temp_filename:
         with open(temp_filename, 'w') as f:
             f.write(yaml.dump(fedml_config))
-        args = fedml.init(load_arguments(temp_filename, rank, 'client'))
-
+        args = fedml.init(load_arguments(temp_filename, 0, 'server'))
     return args
 
 
-def config_fedml_server(config, rank, clients_ip):
+def config_fedml_server(config, clients_ip):
     with open('src/unifed/frameworks/fedml/config/fedml_config.yaml', 'r') as f:
         try:
             fedml_config = yaml.safe_load(f)
@@ -191,7 +203,7 @@ def config_fedml_server(config, rank, clients_ip):
     print('Loaded fedml config')
 
     ipconfig_fn = fedml_config['comm_args']['grpc_ipconfig_path'].replace(
-        '.csv', f'_{rank}.csv')
+        '.csv', f'_0.csv')
     with open(ipconfig_fn, 'w') as f:
         f.write('receiver_id,ip\n')
         f.write('0,127.0.0.1\n')
@@ -211,14 +223,10 @@ def config_fedml_server(config, rank, clients_ip):
     fedml_config['train_args']['weight_decay'] = config['training']['optimizer_param']['weight_decay']
     fedml_config['comm_args']['grpc_ipconfig_path'] = ipconfig_fn
 
-    with GetTempFileName() as temp_filename:
-        with open(temp_filename, 'w') as f:
-            f.write(yaml.dump(fedml_config))
-        args = fedml.init(load_arguments(temp_filename, rank, 'server'))
-    return args
+    return fedml_config
 
 
-def run_fedml(config, args):
+def run_fedml_client(args, model, device, dataset):
     def custom_client_trainer(model, args):
         if args.dataset == "stackoverflow_logistic_regression":
             trainer = MyModelTrainerTAG(model, args)
@@ -230,6 +238,16 @@ def run_fedml(config, args):
             trainer = ClassificationTrainer(model, args)
         return trainer
 
+    logger = LoggerManager.get_logger(args.rank, 'client')
+    trainer = custom_client_trainer(model, args)
+    fedml_runner = FedMLRunner(
+        args, device, dataset, model,
+        client_trainer=trainer)
+    fedml_runner.run()
+    logger.end()
+
+
+def run_fedml_server(args, model, device, dataset):
     def custom_server_aggregator(model, args):
         if args.dataset == "stackoverflow_lr":
             aggregator = MyServerAggregatorTAGPred(model, args)
@@ -239,6 +257,16 @@ def run_fedml(config, args):
             aggregator = UniFedServerAggregator(model, args)
         return aggregator
 
+    logger = LoggerManager.get_logger(0, 'aggregator')
+    aggregator = custom_server_aggregator(model, args)
+    fedml_runner = FedMLRunner(
+        args, device, dataset, model,
+        server_aggregator=aggregator)
+    fedml_runner.run()
+    logger.end()
+
+
+def run_fedml(config, args):
     # init device
     device = fedml.device.get_device(args)
 
@@ -254,19 +282,9 @@ def run_fedml(config, args):
     )
 
     if args.role == "client":
-        trainer = custom_client_trainer(model, args)
-        fedml_runner = FedMLRunner(
-            args, device, dataset, model,
-            client_trainer=trainer)
-        fedml_runner.run()
-        trainer.end()
+        run_fedml_client(args, model, device, dataset)
     elif args.role == "server":
-        aggregator = custom_server_aggregator(model, args)
-        fedml_runner = FedMLRunner(
-            args, device, dataset, model,
-            server_aggregator=aggregator)
-        fedml_runner.run()
-        aggregator.end()
+        run_fedml_server(args, model, device, dataset)
 
 
 @pop.handle("unifed.fedml:server")
@@ -301,7 +319,8 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
 
     # Configure FedML
     print('Setup server...')
-    args = config_fedml_server(config, 0, clients_ip)
+    fedml_config = config_fedml_server(config, clients_ip)
+    args = init_fedml_server(fedml_config)
 
     # Send notification to the clients that the server is ready
     cl.send_variable(
@@ -357,7 +376,8 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     cl.recv_variable("server_setup_done", p_server).decode()
 
     # Configure FedML
-    args = config_fedml_client(config, participant_id, server_ip)
+    fedml_config = config_fedml_client(config, participant_id, server_ip)
+    args = init_fedml_client(fedml_config, participant_id)
 
     # Run FedML
     run_fedml(config, args)
