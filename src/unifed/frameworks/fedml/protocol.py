@@ -18,8 +18,7 @@ from .horizontal_exp import run_simulation_horizontal
 from .src.aggregator.default_aggregator import UniFedServerAggregator
 from .src.trainer.classification_trainer import ClassificationTrainer
 from .vertical_exp import run_simulation_vertical
-from .src.fedml.runner import FedMLRunner
-# from fedml import FedMLRunner
+from fedml import FedMLRunner
 from .src.logger import LoggerManager
 
 pop = CL.ProtocolOperator(__name__)

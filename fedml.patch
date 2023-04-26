@@ -1,0 +1,91 @@
+diff --git a/python/fedml/cross_silo/client/fedml_client_master_manager.py b/python/fedml/cross_silo/client/fedml_client_master_manager.py
+index 6e4d2b74..13c43d65 100644
+--- a/python/fedml/cross_silo/client/fedml_client_master_manager.py
++++ b/python/fedml/cross_silo/client/fedml_client_master_manager.py
+@@ -13,7 +13,8 @@ from ...core.distributed.fedml_comm_manager import FedMLCommManager
+ from ...core.distributed.communication.message import Message
+ from ...core.mlops.mlops_profiler_event import MLOpsProfilerEvent
+ 
+-
++from unifed.frameworks.fedml.src.logger import LoggerManager
++from pympler.asizeof import asizeof
+ class ClientMasterManager(FedMLCommManager):
+     ONLINE_STATUS_FLAG = "ONLINE"
+     RUN_FINISHED_STATUS_FLAG = "FINISHED"
+@@ -34,6 +35,8 @@ class ClientMasterManager(FedMLCommManager):
+         self.has_sent_online_msg = False
+         self.is_inited = False
+ 
++        self.logger = LoggerManager.get_logger(args.rank)
++
+     def register_message_receive_handlers(self):
+         self.register_message_receive_handler(
+             MyMessage.MSG_TYPE_CONNECTION_IS_READY, self.handle_message_connection_ready
+@@ -119,10 +122,13 @@ class ClientMasterManager(FedMLCommManager):
+     def send_model_to_server(self, receive_id, weights, local_sample_num):
+         tick = time.time()
+         mlops.event("comm_c2s", event_started=True, event_value=str(self.round_idx))
+-        message = Message(MyMessage.MSG_TYPE_C2S_SEND_MODEL_TO_SERVER, self.client_real_id, receive_id,)
+-        message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, weights)
+-        message.add_params(MyMessage.MSG_ARG_KEY_NUM_SAMPLES, local_sample_num)
+-        self.send_message(message)
++
++        with self.logger.communication(target_id=0) as c:
++            message = Message(MyMessage.MSG_TYPE_C2S_SEND_MODEL_TO_SERVER, self.client_real_id, receive_id,)
++            message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, weights)
++            message.add_params(MyMessage.MSG_ARG_KEY_NUM_SAMPLES, local_sample_num)
++            c.report_metric('byte', asizeof(message))
++            self.send_message(message)
+ 
+         MLOpsProfilerEvent.log_to_wandb({"Communication/Send_Total": time.time() - tick})
+         mlops.log_client_model_info(
+diff --git a/python/fedml/cross_silo/server/fedml_server_manager.py b/python/fedml/cross_silo/server/fedml_server_manager.py
+index f87b9202..6195ffde 100644
+--- a/python/fedml/cross_silo/server/fedml_server_manager.py
++++ b/python/fedml/cross_silo/server/fedml_server_manager.py
+@@ -11,6 +11,8 @@ from ...core.distributed.communication.message import Message
+ from ...core.distributed.fedml_comm_manager import FedMLCommManager
+ from ...core.mlops.mlops_profiler_event import MLOpsProfilerEvent
+ 
++from unifed.frameworks.fedml.src.logger import LoggerManager
++from pympler.asizeof import asizeof
+ 
+ class FedMLServerManager(FedMLCommManager):
+     ONLINE_STATUS_FLAG = "ONLINE"
+@@ -34,6 +36,8 @@ class FedMLServerManager(FedMLCommManager):
+         self.client_id_list_in_this_round = None
+         self.data_silo_index_list = None
+ 
++        self.logger = LoggerManager.get_logger(0)
++
+     def run(self):
+         super().run()
+ 
+@@ -276,15 +280,18 @@ class FedMLServerManager(FedMLCommManager):
+                                           global_model_url=None, global_model_key=None):
+         tick = time.time()
+         logging.info("send_message_sync_model_to_client. receive_id = %d" % receive_id)
+-        message = Message(MyMessage.MSG_TYPE_S2C_SYNC_MODEL_TO_CLIENT, self.get_sender_id(), receive_id, )
+-        message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, global_model_params)
+-        if global_model_url is not None:
+-            message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS_URL, global_model_url)
+-        if global_model_key is not None:
+-            message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS_KEY, global_model_key)
+-        message.add_params(MyMessage.MSG_ARG_KEY_CLIENT_INDEX, str(client_index))
+-        message.add_params(MyMessage.MSG_ARG_KEY_CLIENT_OS, "PythonClient")
+-        self.send_message(message)
++
++        with self.logger.communication(target_id=receive_id) as c:
++            message = Message(MyMessage.MSG_TYPE_S2C_SYNC_MODEL_TO_CLIENT, self.get_sender_id(), receive_id, )
++            message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS, global_model_params)
++            if global_model_url is not None:
++                message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS_URL, global_model_url)
++            if global_model_key is not None:
++                message.add_params(MyMessage.MSG_ARG_KEY_MODEL_PARAMS_KEY, global_model_key)
++            message.add_params(MyMessage.MSG_ARG_KEY_CLIENT_INDEX, str(client_index))
++            message.add_params(MyMessage.MSG_ARG_KEY_CLIENT_OS, "PythonClient")
++            c.report_metric('byte', asizeof(message))
++            self.send_message(message)
+ 
+         MLOpsProfilerEvent.log_to_wandb({"Communiaction/Send_Total": time.time() - tick})
+ 

@@ -11,6 +11,9 @@ conda install pytorch pytorch-cuda=11.7 -c pytorch -c nvidia
 git clone https://github.com/FedML-AI/FedML.git
 cd FedML
 git checkout a8b59a6346bf548dc66bd2266af5070ee15db4eb
+cp ../fedml.patch .
+git apply --whitespace=fix fedml.patch
+
 cd python
 pip install aiohttp==3.8.1
 pip install -e .
