@@ -11,43 +11,18 @@ class LoggerManager(object):
         return self._instance
 
     @classmethod
-    def get_logger(self, rank, role):
+    def get_logger(self, rank, role=None, output_dir=None):
         if rank not in self.loggers:
+            if role is None or output_dir is None:
+                raise RuntimeError(
+                    'The role and output_dir must be specified when creating a new logger.')
+
             self.loggers.setdefault(
                 rank,
                 flbenchmark.logging.BasicLogger(
                     id=rank,
                     agent_type=role,
+                    dir=output_dir + '/log',
                 )
             )
         return self.loggers[rank]
-
-
-class ClientLogger(object):
-    _instance = None
-    logger = None
-
-    def __new__(self, args=None):
-        if self._instance is None:
-            self._instance = super().__new__(self)
-            self.logger = \
-                flbenchmark.logging.BasicLogger(
-                    id=args.rank,
-                    agent_type='client',
-                )
-        return self._instance
-
-
-class ServerLogger(object):
-    _instance = None
-    logger = None
-
-    def __new__(self):
-        if self._instance is None:
-            self._instance = super().__new__(self)
-            self.logger = \
-                flbenchmark.logging.BasicLogger(
-                    id=0,
-                    agent_type='aggregator',
-                )
-        return self._instance
