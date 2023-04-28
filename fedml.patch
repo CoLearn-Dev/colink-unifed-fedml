@@ -1,3 +1,31 @@
+diff --git a/python/fedml/cli/edge_deployment/client_constants.py b/python/fedml/cli/edge_deployment/client_constants.py
+index 6583f046..64d39a2b 100644
+--- a/python/fedml/cli/edge_deployment/client_constants.py
++++ b/python/fedml/cli/edge_deployment/client_constants.py
+@@ -66,7 +66,8 @@ class ClientConstants(object):
+ 
+     @staticmethod
+     def get_fedml_home_dir():
+-        home_dir = expanduser("~")
++        # home_dir = expanduser("~")
++        home_dir = 'unifed/fedml/'
+         fedml_home_dir = os.path.join(home_dir, ClientConstants.LOCAL_HOME_RUNNER_DIR_NAME)
+         return fedml_home_dir
+ 
+diff --git a/python/fedml/cli/server_deployment/server_constants.py b/python/fedml/cli/server_deployment/server_constants.py
+index 9cbfdae1..dc37eb17 100644
+--- a/python/fedml/cli/server_deployment/server_constants.py
++++ b/python/fedml/cli/server_deployment/server_constants.py
+@@ -58,7 +58,8 @@ class ServerConstants(object):
+ 
+     @staticmethod
+     def get_fedml_home_dir():
+-        home_dir = expanduser("~")
++        # home_dir = expanduser("~")
++        home_dir = 'unifed/fedml/'
+         fedml_home_dir = os.path.join(home_dir, ServerConstants.LOCAL_HOME_RUNNER_DIR_NAME)
+         return fedml_home_dir
+ 
 diff --git a/python/fedml/cross_silo/client/fedml_client_master_manager.py b/python/fedml/cross_silo/client/fedml_client_master_manager.py
 index 6e4d2b74..13c43d65 100644
 --- a/python/fedml/cross_silo/client/fedml_client_master_manager.py
