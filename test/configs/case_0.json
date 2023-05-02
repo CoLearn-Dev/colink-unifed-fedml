@@ -6,18 +6,18 @@
   "deployment": {
     "mode": "colink",
     "participants": [
-      [
-        "0",
-        "server"
-      ],
-      [
-        "1",
-        "client"
-      ],
-      [
-        "2",
-        "client"
-      ]
+      {
+        "user_id": "0236f00d8e378b20634c901acfe004f0f85f5cdd7fa6377dab79e093bc62eabf9c",
+        "role": "server"
+      },
+      {
+        "user_id": "0261bff483acdeb79ff332f003249cb8e303896487509c670ab3fc84c00acb16fd",
+        "role": "client"
+      },
+      {
+        "user_id": "0349b8bff5ee389899319b1f6171016de95faed0179cce89521b5a066e3d8f5e2d",
+        "role": "client"
+      }
     ]
   },
   "training": {
