@@ -367,7 +367,7 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     run_fedml(config, args, participant_root_dir)
 
     # Write output and log
-    output, log = write_file(participant_id)
+    output, log = write_file(participant_id, participant_root_dir)
     cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
     cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
 
