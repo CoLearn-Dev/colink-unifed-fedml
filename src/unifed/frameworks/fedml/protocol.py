@@ -311,7 +311,8 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     try:
         # Get task ID
         task_id = cl.get_task_id()
-        print(f'Running server for task {task_id}...')
+        user_id = cl.get_user_id()
+        print(f'Running {user_id} as server for task {task_id}...')
 
         # Get participant ID
         participant_id = [
@@ -383,7 +384,8 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
 def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # Get task ID
     task_id = cl.get_task_id()
-    print(f'Running server for task {task_id}...')
+    user_id = cl.get_user_id()
+    print(f'Running {user_id} as client for task {task_id}...')
 
     # Get participant ID
     participant_id = [
