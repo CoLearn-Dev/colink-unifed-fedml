@@ -262,6 +262,7 @@ def run_fedml_client(args, model, device, dataset, output_dir):
         client_trainer=trainer)
     fedml_runner.run()
     logger.end()
+    LoggerManager.reset()
 
 
 def run_fedml_server(args, model, device, dataset, output_dir):
@@ -281,6 +282,7 @@ def run_fedml_server(args, model, device, dataset, output_dir):
         server_aggregator=aggregator)
     fedml_runner.run()
     logger.end()
+    LoggerManager.reset()
 
 
 def run_fedml(config, args, output_dir):

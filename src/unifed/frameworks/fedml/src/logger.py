@@ -26,3 +26,9 @@ class LoggerManager(object):
                 )
             )
         return self.loggers[rank]
+    
+    @classmethod
+    def reset(self):
+        print('Resetting loggers...')
+        del self.loggers
+        self.loggers = dict()
