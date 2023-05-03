@@ -62,7 +62,8 @@ def test_with_config(config_file_path):
 if __name__ == "__main__":
     from pprint import pprint
     import time
+    import sys
     nw = time.time()
-    target_case = "test/configs/case_0.json"
+    target_case = f"test/configs/case_{sys.argv[1]}.json"
     print(json.dumps(simulate_with_config(target_case), indent=2))
     print("Time elapsed:", time.time() - nw)
