@@ -39,9 +39,7 @@ def load_config_from_param_and_check(param: bytes):
 
 
 def download_data(config):
-    flbd = flbenchmark.datasets.FLBDatasets('data')
-
-    print("Downloading Data...")
+    flbd = flbenchmark.datasets.FLBDatasets('../data')
 
     dataset_name = (
         'student_horizontal',
@@ -55,25 +53,10 @@ def download_data(config):
         if config["dataset"] == x:
             train_dataset, test_dataset = flbd.fateDatasets(x)
             flbenchmark.datasets.convert_to_csv(
-                train_dataset, out_dir='data/{}_train'.format(x))
+                train_dataset, out_dir='../data/{}_train'.format(x))
             if x != 'vehicle_scale_horizontal':
                 flbenchmark.datasets.convert_to_csv(
-                    test_dataset, out_dir='data/{}_test'.format(x))
-
-    vertical = (
-        'breast_vertical',
-        'give_credit_vertical',
-        'default_credit_vertical'
-    )
-
-    for x in vertical:
-        if config["dataset"] == x:
-            my_dataset = flbd.fateDatasets(x)
-            flbenchmark.datasets.convert_to_csv(
-                my_dataset[0], out_dir='data/{}'.format(x))
-            if my_dataset[1] != None:
-                flbenchmark.datasets.convert_to_csv(
-                    my_dataset[1], out_dir='data/{}'.format(x))
+                    test_dataset, out_dir='../data/{}_test'.format(x))
 
     leaf = (
         'femnist',
@@ -289,8 +272,7 @@ def run_fedml(config, args, output_dir):
     # init device
     device = fedml.device.get_device(args)
 
-    # load data
-    download_data(config)
+    # load dataset
     dataset = load_data_horizontal(config['training'], config['dataset'])
 
     # load model
@@ -349,6 +331,9 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         fedml_config = config_fedml_server(
             config, clients_ip, participant_root_dir)
         args = init_fedml_server(fedml_config, participant_root_dir)
+
+        # Download data
+        download_data(config)
 
         # Send notification to the clients that the server is ready
         cl.send_variable(
@@ -428,6 +413,9 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         config, participant_id, server_ip, participant_root_dir)
     args = init_fedml_client(
         fedml_config, participant_id, participant_root_dir)
+    
+    # Download data
+    download_data(config)
 
     # Run FedML
     run_fedml(config, args, participant_root_dir)
