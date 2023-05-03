@@ -109,8 +109,8 @@ def batch_data(data, batch_size):
 
 
 def load_partition_data_give_credit_horizontal(batch_size,
-                              train_path="../csv_data/give_credit_horizontal_train/",
-                              test_path="../csv_data/give_credit_horizontal_test/"):
+                                               train_path="../data/give_credit_horizontal_train/",
+                                               test_path="../data/give_credit_horizontal_test/"):
     users, groups, train_data, test_data = read_data(train_path, test_path)
     print(train_data['host'].keys())
 
