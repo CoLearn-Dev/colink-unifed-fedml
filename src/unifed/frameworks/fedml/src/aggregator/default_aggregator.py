@@ -117,7 +117,10 @@ class UniFedServerAggregator(DefaultServerAggregator):
         with self.logger.model_evaluation() as e:
             e.report_metric('loss', test_loss)
             e.report_metric('accuracy', test_acc)
-            e.report_metric('auc', roc_auc_score(
-                metrics['predicted'], metrics['truth']))
+            try:
+                e.report_metric('auc', roc_auc_score(
+                    metrics['predicted'], metrics['truth']))
+            except:
+                pass
 
         return (test_acc, test_loss, None, None)

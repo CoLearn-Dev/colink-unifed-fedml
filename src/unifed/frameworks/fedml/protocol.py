@@ -7,6 +7,7 @@ import colink as CL
 import fedml
 import flbenchmark.datasets
 import yaml
+from fedml import FedMLRunner
 from fedml.arguments import Arguments
 
 from unifed.frameworks.fedml.util import (GetTempFileName, get_local_ip,
@@ -16,10 +17,9 @@ from .horizontal_exp import create_model
 from .horizontal_exp import load_data as load_data_horizontal
 from .horizontal_exp import run_simulation_horizontal
 from .src.aggregator.default_aggregator import UniFedServerAggregator
+from .src.logger import LoggerManager
 from .src.trainer.classification_trainer import ClassificationTrainer
 from .vertical_exp import run_simulation_vertical
-from fedml import FedMLRunner
-from .src.logger import LoggerManager
 
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
