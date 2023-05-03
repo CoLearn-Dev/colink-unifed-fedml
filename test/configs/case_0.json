@@ -1,36 +1,39 @@
 {
   "framework": "fedml",
-  "dataset": "breast_horizontal",
+  "dataset": "give_credit_horizontal",
   "algorithm": "fed_avg",
   "model": "logistic_regression",
   "deployment": {
     "mode": "colink",
     "participants": [
       {
-        "user_id": "0236f00d8e378b20634c901acfe004f0f85f5cdd7fa6377dab79e093bc62eabf9c",
+        "user_id": "03eb942350535b01a09613ae9ba3b5817dccb3bf51f1b6d3c5f46a055055c2e535",
         "role": "server"
       },
       {
-        "user_id": "0261bff483acdeb79ff332f003249cb8e303896487509c670ab3fc84c00acb16fd",
+        "user_id": "0334575a3240bbc2e7e5a8d9215ed0787b79e18f451aaca126bbcc536658123467",
         "role": "client"
       },
       {
-        "user_id": "0349b8bff5ee389899319b1f6171016de95faed0179cce89521b5a066e3d8f5e2d",
+        "user_id": "026843e5227b31bc352be4a54be5dcf0df994ba7979165fad53c636d20db882520",
         "role": "client"
       }
     ]
   },
   "training": {
-    "epochs": 2,
-    "batch_size": 32,
-    "inner_step": 3,
+    "epochs": 30,
+    "batch_size": 64,
+    "inner_step": 1,
     "client_per_round": 2,
     "tot_client_num": 2,
     "learning_rate": 0.01,
     "loss_func": "cross_entropy",
-    "optimizer": "adam",
+    "optimizer": "sgd",
     "optimizer_param": {
-      "weight_decay": 0
+      "momentum": 0.9,
+      "dampening": 0,
+      "weight_decay": 0,
+      "nesterov": false
     }
   }
 }
