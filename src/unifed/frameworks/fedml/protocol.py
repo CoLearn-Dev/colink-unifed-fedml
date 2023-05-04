@@ -39,7 +39,8 @@ def load_config_from_param_and_check(param: bytes):
 
 
 def download_data(config):
-    flbd = flbenchmark.datasets.FLBDatasets('../data')
+    data_dir = '~/flbenchmark.working/data'
+    flbd = flbenchmark.datasets.FLBDatasets(data_dir)
 
     dataset_name = (
         'student_horizontal',
@@ -53,10 +54,10 @@ def download_data(config):
         if config["dataset"] == x:
             train_dataset, test_dataset = flbd.fateDatasets(x)
             flbenchmark.datasets.convert_to_csv(
-                train_dataset, out_dir='../data/{}_train'.format(x))
+                train_dataset, out_dir=f'{data_dir}/{x}_train')
             if x != 'vehicle_scale_horizontal':
                 flbenchmark.datasets.convert_to_csv(
-                    test_dataset, out_dir='../data/{}_test'.format(x))
+                    test_dataset, out_dir=f'{data_dir}/{x}_test')
 
     leaf = (
         'femnist',
