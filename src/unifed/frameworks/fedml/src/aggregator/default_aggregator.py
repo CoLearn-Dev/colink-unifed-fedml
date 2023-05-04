@@ -118,8 +118,8 @@ class UniFedServerAggregator(DefaultServerAggregator):
             e.report_metric('loss', test_loss)
             e.report_metric('accuracy', test_acc)
             try:
-                e.report_metric('auc', roc_auc_score(
-                    metrics['predicted'], metrics['truth']))
+                auc = roc_auc_score(metrics['predicted'], metrics['truth'])
+                e.report_metric('auc', auc)
             except:
                 pass
 
