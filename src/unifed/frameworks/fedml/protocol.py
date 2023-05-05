@@ -26,6 +26,22 @@ UNIFED_TASK_DIR = "unifed:task"
 
 ROOT_DIR = 'unifed'
 FRAMEWORK = 'fedml'
+DATA_DIR = os.path.expanduser('~/flbenchmark.working/data')
+
+FATE_DATASETS = (
+    'student_horizontal',
+    'breast_horizontal',
+    'default_credit_horizontal',
+    'give_credit_horizontal',
+    'vehicle_scale_horizontal'
+)
+
+LEAF_DATASETS = (
+    'femnist',
+    'reddit',
+    'celeba',
+    'shakespeare',
+)
 
 
 def load_config_from_param_and_check(param: bytes):
@@ -38,37 +54,29 @@ def load_config_from_param_and_check(param: bytes):
     return unifed_config
 
 
-def download_data(config):
-    data_dir = '~/flbenchmark.working/data'
-    flbd = flbenchmark.datasets.FLBDatasets(data_dir)
+def download_data(args):
+    flbd = flbenchmark.datasets.FLBDatasets(DATA_DIR)
 
-    dataset_name = (
-        'student_horizontal',
-        'breast_horizontal',
-        'default_credit_horizontal',
-        'give_credit_horizontal',
-        'vehicle_scale_horizontal'
-    )
+    dataset_name = args.dataset
+    if dataset_name in FATE_DATASETS:
+        train_dataset, test_dataset = flbd.fateDatasets(dataset_name)
 
-    for x in dataset_name:
-        if config["dataset"] == x:
-            train_dataset, test_dataset = flbd.fateDatasets(x)
-            flbenchmark.datasets.convert_to_csv(
-                train_dataset, out_dir=f'{data_dir}/{x}_train')
-            if x != 'vehicle_scale_horizontal':
-                flbenchmark.datasets.convert_to_csv(
-                    test_dataset, out_dir=f'{data_dir}/{x}_test')
+        flbenchmark.datasets.convert_to_csv(
+            train_dataset,
+            out_dir=f'{DATA_DIR}/{dataset_name}_train',
+        )
 
-    leaf = (
-        'femnist',
-        'reddit',
-        'celeba',
-        'shakespeare',
-    )
+        if dataset_name == 'vehicle_scale_horizontal':
+            return
 
-    for x in leaf:
-        if config["dataset"] == x:
-            my_dataset = flbd.leafDatasets(x)
+        flbenchmark.datasets.convert_to_csv(
+            test_dataset,
+            out_dir=f'{DATA_DIR}/{dataset_name}_test',
+        )
+    elif dataset_name in LEAF_DATASETS:
+        flbd.leafDatasets(dataset_name)
+    else:
+        raise ValueError(f"Unknown dataset {dataset_name}")
 
 
 def write_file(participant_id, output_dir):
@@ -269,19 +277,16 @@ def run_fedml_server(args, model, device, dataset, output_dir):
     LoggerManager.reset()
 
 
-def run_fedml(config, args, output_dir):
+def run_fedml(args, output_dir):
     # init device
     device = fedml.device.get_device(args)
 
     # load dataset
-    dataset = load_data_horizontal(config['training'], config['dataset'])
+    dataset, input_dim, output_dim = \
+        load_data_horizontal(args.dataset, args.batch_size, DATA_DIR)
 
     # load model
-    model = create_model(
-        config,
-        model_name=config['model'],
-        output_dim=dataset[7],
-    )
+    model = create_model(args.model, input_dim, output_dim)
 
     if args.role == "client":
         run_fedml_client(args, model, device, dataset, output_dir)
@@ -334,7 +339,7 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         args = init_fedml_server(fedml_config, participant_root_dir)
 
         # Download data
-        download_data(config)
+        download_data(args)
 
         # Send notification to the clients that the server is ready
         cl.send_variable(
@@ -352,7 +357,7 @@ def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         raise e
 
     # Run FedML
-    run_fedml(config, args, participant_root_dir)
+    run_fedml(args, participant_root_dir)
 
     # Write output and log
     output, log = write_file(participant_id, participant_root_dir)
@@ -414,12 +419,12 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
         config, participant_id, server_ip, participant_root_dir)
     args = init_fedml_client(
         fedml_config, participant_id, participant_root_dir)
-    
+
     # Download data
-    download_data(config)
+    download_data(args)
 
     # Run FedML
-    run_fedml(config, args, participant_root_dir)
+    run_fedml(args, participant_root_dir)
 
     # Write output and log
     output, log = write_file(participant_id, participant_root_dir)

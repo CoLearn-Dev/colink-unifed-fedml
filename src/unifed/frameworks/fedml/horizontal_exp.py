@@ -40,23 +40,26 @@ LEAF_DATASETS = (
 )
 
 
-def load_data(config, dataset_name):
-    data_dir = os.path.expanduser(f'~/flbenchmark.working/data/')
-
+def load_data(dataset_name, batch_size, data_dir):
     if dataset_name in FATE_DATASETS:
         train_dir = f'{data_dir}/{dataset_name}_train/'
         test_dir = f'{data_dir}/{dataset_name}_test/'
 
         if dataset_name == 'student_horizontal':
             load_partition_data = load_partition_data_student_horizontal
+            input_dim = 13
         elif dataset_name == 'breast_horizontal':
             load_partition_data = load_partition_data_breast_horizontal
+            input_dim = 30
         elif dataset_name == 'default_credit_horizontal':
             load_partition_data = load_partition_data_default_credit_horizontal
+            input_dim = 23
         elif dataset_name == 'give_credit_horizontal':
             load_partition_data = load_partition_data_give_credit_horizontal
+            input_dim = 10
         elif dataset_name == 'vehicle_scale_horizontal':
             load_partition_data = load_partition_data_vehicle_scale_horizontal
+            input_dim = 18
         else:
             raise ValueError(f'Unknown dataset {dataset_name}')
     elif dataset_name in LEAF_DATASETS:
@@ -65,6 +68,7 @@ def load_data(config, dataset_name):
 
         if dataset_name == 'femnist':
             load_partition_data = load_partition_data_femnist
+            input_dim = 28 * 28
         else:
             raise ValueError(f'Unknown dataset {dataset_name}')
     else:
@@ -78,7 +82,7 @@ def load_data(config, dataset_name):
         train_data_local_dict, test_data_local_dict,
         class_num
     ] = load_partition_data(
-        config['batch_size'],
+        batch_size,
         train_dir,
         test_dir,
     )
@@ -89,25 +93,10 @@ def load_data(config, dataset_name):
         train_data_local_num_dict,
         train_data_local_dict, test_data_local_dict,
         class_num,
-    ]
+    ], input_dim, class_num
 
 
-def create_model(config, model_name, output_dim):
-    if config['dataset'] == 'breast_horizontal':
-        input_dim = 30
-    elif config['dataset'] == 'default_credit_horizontal':
-        input_dim = 23
-    elif config['dataset'] == 'give_credit_horizontal':
-        input_dim = 10
-    elif config['dataset'] == 'vehicle_scale_horizontal':
-        input_dim = 18
-    elif config['dataset'] == 'student_horizontal':
-        input_dim = 13
-    elif config['dataset'] == 'femnist':
-        input_dim = 28 * 28
-    else:
-        raise ValueError(f'Unknown dataset {config["dataset"]}')
-
+def create_model(model_name, input_dim, output_dim):
     if model_name.startswith('mlp'):
         hidden = [int(x) for x in model_name.split('_')[1:]]
         model = MLP(input_dim, output_dim, hidden)
@@ -119,7 +108,6 @@ def create_model(config, model_name, output_dim):
         model = LinearRegression(input_dim, 1)
     else:
         raise ValueError(f'Unknown model {model_name}')
-
     return model
 
 
