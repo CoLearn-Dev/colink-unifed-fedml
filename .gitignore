@@ -144,3 +144,5 @@ temp.json
 # Data
 data/
 wandb/
+output/
+FedML/
