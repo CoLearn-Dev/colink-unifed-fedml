@@ -117,3 +117,369 @@ index f87b9202..6195ffde 100644
  
          MLOpsProfilerEvent.log_to_wandb({"Communiaction/Send_Total": time.time() - tick})
  
+diff --git a/python/fedml/model/finance/vfl_models_standalone.py b/python/fedml/model/finance/vfl_models_standalone.py
+index 89640c84..30824610 100644
+--- a/python/fedml/model/finance/vfl_models_standalone.py
++++ b/python/fedml/model/finance/vfl_models_standalone.py
+@@ -4,14 +4,23 @@ import torch.optim as optim
+ 
+ 
+ class DenseModel(nn.Module):
+-    def __init__(self, input_dim, output_dim, learning_rate=0.01, bias=True):
++    def __init__(self, input_dim, output_dim, learning_rate, optim_param, bias=True):
+         super(DenseModel, self).__init__()
+         self.classifier = nn.Sequential(
+-            nn.Linear(in_features=input_dim, out_features=output_dim, bias=bias),
++            nn.Linear(
++                in_features=input_dim,
++                out_features=output_dim,
++                bias=bias,
++            ),
+         )
+         self.is_debug = False
+         self.optimizer = optim.SGD(
+-            self.parameters(), momentum=0.9, weight_decay=0.01, lr=learning_rate
++            self.parameters(),
++            momentum=optim_param['momentum'],
++            weight_decay=optim_param['weight_decay'],
++            dampening=optim_param['dampening'],
++            nesterov=optim_param['nesterov'],
++            lr=learning_rate,
+         )
+ 
+     def forward(self, x):
+@@ -38,16 +47,25 @@ class DenseModel(nn.Module):
+ 
+ 
+ class LocalModel(nn.Module):
+-    def __init__(self, input_dim, output_dim, learning_rate):
++    def __init__(self, input_dim, output_dim, learning_rate, optim_param):
+         super(LocalModel, self).__init__()
+         self.classifier = nn.Sequential(
+-            nn.Linear(in_features=input_dim, out_features=output_dim), nn.LeakyReLU()
++            nn.Linear(
++                in_features=input_dim,
++                out_features=output_dim,
++            ),
++            nn.LeakyReLU()
+         )
+         self.output_dim = output_dim
+         self.is_debug = False
+         self.learning_rate = learning_rate
+         self.optimizer = optim.SGD(
+-            self.parameters(), momentum=0.9, weight_decay=0.01, lr=learning_rate
++            self.parameters(),
++            momentum=optim_param['momentum'],
++            weight_decay=optim_param['weight_decay'],
++            dampening=optim_param['dampening'],
++            nesterov=optim_param['nesterov'],
++            lr=learning_rate,
+         )
+ 
+     def forward(self, x):
+diff --git a/python/fedml/simulation/sp/classical_vertical_fl/party_models.py b/python/fedml/simulation/sp/classical_vertical_fl/party_models.py
+index 5fa8237c..43b7ecb7 100644
+--- a/python/fedml/simulation/sp/classical_vertical_fl/party_models.py
++++ b/python/fedml/simulation/sp/classical_vertical_fl/party_models.py
+@@ -2,8 +2,6 @@ import numpy as np
+ import torch
+ import torch.nn as nn
+ 
+-from ....model.finance.vfl_models_standalone import DenseModel
+-
+ 
+ def sigmoid(x):
+     return 1.0 / (1.0 + np.exp(-x))
+@@ -17,7 +15,6 @@ class VFLGuestModel(object):
+         self.is_debug = False
+ 
+         self.classifier_criterion = nn.BCEWithLogitsLoss()
+-        self.dense_model = DenseModel(input_dim=self.feature_dim, output_dim=1, bias=True)
+         self.parties_grad_component_list = []
+         self.current_global_step = None
+         self.X = None
+@@ -45,9 +42,14 @@ class VFLGuestModel(object):
+             U = U + comp
+         return sigmoid(np.sum(U, axis=1))
+ 
+-    def receive_components(self, component_list):
+-        for party_component in component_list:
+-            self.parties_grad_component_list.append(party_component)
++    def receive_components(self, component_list, logger):
++        with logger.communication(target_id=0) as c:
++            for party_component in component_list:
++                c.report_metric(
++                    'byte',
++                    party_component.size * party_component.itemsize
++                )
++                self.parties_grad_component_list.append(party_component)
+ 
+     def fit(self):
+         self._fit(self.X, self.y)
+@@ -61,7 +63,7 @@ class VFLGuestModel(object):
+         U = torch.tensor(U, requires_grad=True).float()
+         y = torch.tensor(y)
+         y = y.type_as(U)
+-        class_loss = self.classifier_criterion(U, y)  # pylint: disable=E1102
++        class_loss = self.classifier_criterion(U, y)
+         grads = torch.autograd.grad(outputs=class_loss, inputs=U)
+         self.top_grads = grads[0].numpy()
+         self.loss = class_loss.item()
+@@ -84,7 +86,6 @@ class VFLHostModel(object):
+         self.feature_dim = local_model.get_output_dim()
+         self.is_debug = False
+ 
+-        self.dense_model = DenseModel(input_dim=self.feature_dim, output_dim=1, bias=False)
+         self.common_grad = None
+         self.partial_common_grad = None
+         self.current_global_step = None
+@@ -97,21 +98,29 @@ class VFLHostModel(object):
+         self.X = X
+         self.current_global_step = global_step
+ 
+-    def _forward_computation(self, X):
+-        self.A_Z = self.localModel.forward(X)
+-        A_U = self.dense_model.forward(self.A_Z)
++    def _forward_computation(self, X, logger):
++        if logger is None:
++            self.A_Z = self.localModel.forward(X)
++            A_U = self.dense_model.forward(self.A_Z)
++        else:
++            with logger.computation() as c:
++                self.A_Z = self.localModel.forward(X)
++                A_U = self.dense_model.forward(self.A_Z)
+         return A_U
+ 
+     def _fit(self, X, y):
+         back_grad = self.dense_model.backward(self.A_Z, self.common_grad)
+         self.localModel.backward(X, back_grad)
+ 
+-    def receive_gradients(self, gradients):
+-        self.common_grad = gradients
+-        self._fit(self.X, None)
++    def receive_gradients(self, gradients, logger0, logger1):
++        with logger0.communication(target_id=1) as c:
++            self.common_grad = gradients
++            c.report_metric('byte', gradients.size * gradients.itemsize)
++        with logger1.computation() as c:
++            self._fit(self.X, None)
+ 
+-    def send_components(self):
+-        return self._forward_computation(self.X)
++    def send_components(self, logger):
++        return self._forward_computation(self.X, logger)
+ 
+     def predict(self, X):
+-        return self._forward_computation(X)
++        return self._forward_computation(X, None)
+diff --git a/python/fedml/simulation/sp/classical_vertical_fl/vfl.py b/python/fedml/simulation/sp/classical_vertical_fl/vfl.py
+index dd421d32..85005517 100644
+--- a/python/fedml/simulation/sp/classical_vertical_fl/vfl.py
++++ b/python/fedml/simulation/sp/classical_vertical_fl/vfl.py
+@@ -8,6 +8,10 @@ class VerticalMultiplePartyLogisticRegressionFederatedLearning(object):
+         self.party_dict = dict()
+         self.is_debug = False
+ 
++    def set_logger(self, logger0, logger1):
++        self.logger0 = logger0
++        self.logger1 = logger1
++
+     def set_debug(self, is_debug):
+         self.is_debug = is_debug
+ 
+@@ -33,14 +37,19 @@ class VerticalMultiplePartyLogisticRegressionFederatedLearning(object):
+             print("==> Guest receive intermediate computing results from hosts")
+         comp_list = []
+         for party in self.party_dict.values():
+-            logits = party.send_components()
++            logits = party.send_components(self.logger1)
+             comp_list.append(logits)
+-        self.party_a.receive_components(component_list=comp_list)
++        self.party_a.receive_components(
++            component_list=comp_list,
++            logger=self.logger1
++        )
+ 
+         if self.is_debug:
+             print("==> Guest train and computes loss")
+-        self.party_a.fit()
+-        loss = self.party_a.get_loss()
++        with self.logger0.computation() as c:
++            self.party_a.fit()
++            loss = self.party_a.get_loss()
++            c.report_metric('loss', loss)
+ 
+         if self.is_debug:
+             print("==> Guest sends out common grad")
+@@ -49,7 +58,7 @@ class VerticalMultiplePartyLogisticRegressionFederatedLearning(object):
+         if self.is_debug:
+             print("==> Hosts receive common grad from guest and perform training")
+         for party in self.party_dict.values():
+-            party.receive_gradients(grad_result)
++            party.receive_gradients(grad_result, self.logger0, self.logger1)
+ 
+         return loss
+ 
+diff --git a/python/fedml/simulation/sp/classical_vertical_fl/vfl_fixture.py b/python/fedml/simulation/sp/classical_vertical_fl/vfl_fixture.py
+index 080a76ca..eb4163d2 100644
+--- a/python/fedml/simulation/sp/classical_vertical_fl/vfl_fixture.py
++++ b/python/fedml/simulation/sp/classical_vertical_fl/vfl_fixture.py
+@@ -1,9 +1,16 @@
+ import numpy as np
+-from sklearn.metrics import precision_recall_fscore_support
+-from sklearn.metrics import roc_auc_score, accuracy_score
++from sklearn.metrics import (
++    accuracy_score,
++    roc_auc_score,
++    precision_recall_fscore_support,
++)
++
++import flbenchmark.logging
+ 
+ from .vfl import VerticalMultiplePartyLogisticRegressionFederatedLearning
+ 
++from unifed.frameworks.fedml.src.logger import LoggerManager
++
+ 
+ def compute_correct_prediction(*, y_targets, y_prob_preds, threshold=0.5):
+     y_hat_lbls = []
+@@ -26,12 +33,12 @@ def compute_correct_prediction(*, y_targets, y_prob_preds, threshold=0.5):
+ 
+ class FederatedLearningFixture(object):
+     def __init__(
+-        self, federated_learning: VerticalMultiplePartyLogisticRegressionFederatedLearning,
+-    ):
++        self,
++        federated_learning: VerticalMultiplePartyLogisticRegressionFederatedLearning,
++    ) -> None:
+         self.federated_learning = federated_learning
+ 
+     def fit(self, train_data, test_data, epochs=50, batch_size=-1):
+-
+         main_party_id = self.federated_learning.get_main_party_id()
+         Xa_train = train_data[main_party_id]["X"]
+         y_train = train_data[main_party_id]["Y"]
+@@ -50,47 +57,99 @@ class FederatedLearningFixture(object):
+         print("number of batches:", n_batches)
+ 
+         global_step = -1
+-        recording_period = 30
++        recording_period = n_batches
+         recording_step = -1
+         threshold = 0.5
+ 
+         loss_list = []
+         # running_time_list = []
++
++        logger0 = LoggerManager.get_logger(0)
++        logger1 = LoggerManager.get_logger(1)
++        self.federated_learning.set_logger(logger0, logger1)
++
++        logger0.training_start()
++        logger1.training_start()
++        ROUND = 0
+         for ep in range(epochs):
++            logger0.training_round_start()
++            logger1.training_round_start()
++
+             for batch_idx in range(n_batches):
+                 global_step += 1
+ 
+                 # prepare batch data for party A, which has both X and y.
+-                Xa_batch = Xa_train[batch_idx * batch_size : batch_idx * batch_size + batch_size]
+-                Y_batch = y_train[batch_idx * batch_size : batch_idx * batch_size + batch_size]
++                Xa_batch = Xa_train[
++                    batch_idx * batch_size:(batch_idx + 1) * batch_size
++                ]
++                Y_batch = y_train[
++                    batch_idx * batch_size:(batch_idx + 1) * batch_size
++                ]
+ 
+                 # prepare batch data for all other parties, which only has both X.
+                 party_X_train_batch_dict = dict()
+                 for party_id, party_X in train_data["party_list"].items():
+                     party_X_train_batch_dict[party_id] = party_X[
+-                        batch_idx * batch_size : batch_idx * batch_size + batch_size
++                        batch_idx * batch_size: (batch_idx + 1) * batch_size
+                     ]
+ 
+-                loss = self.federated_learning.fit(Xa_batch, Y_batch, party_X_train_batch_dict, global_step)
++                loss = self.federated_learning.fit(Xa_batch, Y_batch,
++                                                   party_X_train_batch_dict,
++                                                   global_step)
+                 loss_list.append(loss)
+                 if (global_step + 1) % recording_period == 0:
+-                    recording_step += 1
+-                    ave_loss = np.mean(loss_list)
+-                    loss_list = list()
+-                    party_X_test_dict = dict()
+-                    for party_id, party_X in test_data["party_list"].items():
+-                        party_X_test_dict[party_id] = party_X
+-                    y_prob_preds = self.federated_learning.predict(Xa_test, party_X_test_dict)
+-                    y_hat_lbls, statistics = compute_correct_prediction(
+-                        y_targets=y_test, y_prob_preds=y_prob_preds, threshold=threshold
+-                    )
+-                    acc = accuracy_score(y_test, y_hat_lbls)
+-                    auc = roc_auc_score(y_test, y_prob_preds)
+-                    print(
+-                        "--- epoch: {0}, batch: {1}, loss: {2}, acc: {3}, auc: {4}".format(
+-                            ep, batch_idx, ave_loss, acc, auc
++                    if ep == epochs - 1:
++                        break
++                    else:
++                        recording_step += 1
++                        ave_loss = np.mean(loss_list)
++                        loss_list = list()
++                        party_X_test_dict = dict()
++                        for party_id, party_X in test_data["party_list"].items():
++                            party_X_test_dict[party_id] = party_X
++                        y_prob_preds = self.federated_learning.predict(
++                            Xa_test,
++                            party_X_test_dict
++                        )
++                        y_hat_lbls, statistics = compute_correct_prediction(
++                            y_targets=y_test,
++                            y_prob_preds=y_prob_preds,
++                            threshold=threshold
+                         )
+-                    )
+-                    print(
+-                        "---", precision_recall_fscore_support(y_test, y_hat_lbls, average="macro", warn_for=tuple()),
+-                    )
++                        acc = accuracy_score(y_test, y_hat_lbls)
++                        # auc = roc_auc_score(y_test, y_prob_preds)
++                        # print("--- epoch: {0}, batch: {1}, loss: {2}, acc: {3}, auc: {4}"
++                        #       .format(ep, batch_idx, ave_loss, acc, auc))
++                        ROUND += 1
++                        # wandb.log({"Test/Acc": acc, "round": ROUND})
++                        # wandb.log({"Test/AVE_Loss": ave_loss, "round": ROUND})
++                        print({"Test/Acc": acc, "round": ROUND})
++                        print({"Test/AVE_Loss": ave_loss, "round": ROUND})
++
++            logger0.training_round_end()
++            logger1.training_round_end()
++        logger0.training_end()
++        logger1.training_end()
++
++        with logger0.model_evaluation() as e:
++            loss_list = list()
++            party_X_test_dict = dict()
++            for party_id, party_X in test_data["party_list"].items():
++                party_X_test_dict[party_id] = party_X
++            y_prob_preds = self.federated_learning.predict(
++                Xa_test,
++                party_X_test_dict
++            )
++            y_hat_lbls, statistics = compute_correct_prediction(
++                y_targets=y_test,
++                y_prob_preds=y_prob_preds,
++                threshold=threshold
++            )
++            # acc = accuracy_score(y_test, y_hat_lbls)
++            auc = roc_auc_score(y_test, y_hat_lbls)
++            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
++            print("Final AUC = {}".format(auc))
++            print('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
++            e.report_metric('auc', auc)
++        logger0.end()
++        logger1.end()

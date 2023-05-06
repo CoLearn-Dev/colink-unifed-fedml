@@ -1,18 +1,17 @@
 import os
 
+from fedml.model.finance.vfl_models_standalone import DenseModel, LocalModel
+from fedml.simulation.sp.classical_vertical_fl.party_models import (
+    VFLGuestModel, VFLHostModel)
+from fedml.simulation.sp.classical_vertical_fl.vfl import \
+    VerticalMultiplePartyLogisticRegressionFederatedLearning
+from fedml.simulation.sp.classical_vertical_fl.vfl_fixture import \
+    FederatedLearningFixture
 from sklearn.utils import shuffle
 
 from .src.data.preprocessing_data import (breast_load_two_party_data,
                                           default_credit_load_two_party_data,
                                           give_credit_load_two_party_data)
-from .src.model.finance.vfl_models_standalone import DenseModel, LocalModel
-from .src.standalone.classical_vertical_fl.party_models import (VFLGuestModel,
-                                                                VFLHostModel)
-from .src.standalone.classical_vertical_fl.vfl import \
-    VerticalMultiplePartyLogisticRegressionFederatedLearning
-from .src.standalone.classical_vertical_fl.vfl_fixture import \
-    FederatedLearningFixture
-
 from .src.logger import LoggerManager
 
 # from fedml_api.data_preprocessing.preprocessing_data import dvisits_load_two_party_data, motor_load_two_party_data, vehicle_scale_load_two_party_data
