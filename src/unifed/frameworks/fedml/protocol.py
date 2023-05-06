@@ -24,7 +24,7 @@ from .vertical_exp import run_simulation_vertical
 pop = CL.ProtocolOperator(__name__)
 UNIFED_TASK_DIR = "unifed:task"
 
-ROOT_DIR = 'unifed'
+LOGGING_DIR = 'output'
 FRAMEWORK = 'fedml'
 DATA_DIR = os.path.expanduser('~/flbenchmark.working/data')
 
@@ -43,6 +43,12 @@ LEAF_DATASETS = (
     'shakespeare',
 )
 
+VERTICAL_DATASETS = (
+    'breast_vertical',
+    'give_credit_vertical',
+    'default_credit_vertical'
+)
+
 
 def load_config_from_param_and_check(param: bytes):
     unifed_config = json.loads(param.decode())
@@ -54,10 +60,9 @@ def load_config_from_param_and_check(param: bytes):
     return unifed_config
 
 
-def download_data(args):
+def download_data(dataset_name):
     flbd = flbenchmark.datasets.FLBDatasets(DATA_DIR)
 
-    dataset_name = args.dataset
     if dataset_name in FATE_DATASETS:
         train_dataset, test_dataset = flbd.fateDatasets(dataset_name)
 
@@ -75,6 +80,21 @@ def download_data(args):
         )
     elif dataset_name in LEAF_DATASETS:
         flbd.leafDatasets(dataset_name)
+    elif dataset_name in VERTICAL_DATASETS:
+        train_dataset, test_dataset = flbd.fateDatasets(dataset_name)
+
+        flbenchmark.datasets.convert_to_csv(
+            train_dataset,
+            out_dir=f'{DATA_DIR}/{dataset_name}',
+        )
+
+        if test_dataset is None:
+            return
+
+        flbenchmark.datasets.convert_to_csv(
+            test_dataset,
+            out_dir=f'{DATA_DIR}/{dataset_name}',
+        )
     else:
         raise ValueError(f"Unknown dataset {dataset_name}")
 
@@ -99,11 +119,11 @@ def write_file(participant_id, output_dir):
     return output, log
 
 
-def run_simulation(config):
+def run_simulation(config, output_dir):
     if config['dataset'].split('_')[-1] == 'horizontal':
-        run_simulation_horizontal(config)
+        run_simulation_horizontal(config, output_dir)
     elif config['dataset'].split('_')[-1] == 'vertical':
-        run_simulation_vertical(config)
+        run_simulation_vertical(config, output_dir)
     else:
         raise Exception("Not handling this mode yet!")
 
@@ -298,66 +318,69 @@ def run_fedml(args, output_dir):
 @store_error(UNIFED_TASK_DIR)
 @store_return(UNIFED_TASK_DIR)
 def run_server(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
-    try:
-        # Get task ID
-        task_id = cl.get_task_id()
-        user_id = cl.get_user_id()
-        print(f'Running {user_id} as server for task {task_id}...')
+    # Get task ID
+    task_id = cl.get_task_id()
+    user_id = cl.get_user_id()
+    print(f'Running {user_id} as server for task {task_id}...')
 
-        # Get participant ID
-        participant_id = [
-            i for i, p in enumerate(participants)
-            if p.user_id == cl.get_user_id()
-        ][0]
+    # Get participant ID
+    participant_id = [
+        i for i, p in enumerate(participants)
+        if p.user_id == cl.get_user_id()
+    ][0]
 
-        # Create task directory
-        task_root_dir = f'{ROOT_DIR}/{FRAMEWORK}/{task_id}'
-        participant_root_dir = f'{task_root_dir}/{participant_id}'
-        os.makedirs(participant_root_dir, exist_ok=True)
+    # Create task directory
+    task_root_dir = f'{LOGGING_DIR}/{FRAMEWORK}/{task_id}'
+    participant_root_dir = f'{task_root_dir}/{participant_id}'
+    os.makedirs(participant_root_dir, exist_ok=True)
 
-        # Get client IPs from the clients
-        clients_ip = [
-            cl.recv_variable(f'client_ip', p).decode()
-            for p in participants if p.role == 'client'
-        ]
+    # Get client IPs from the clients
+    clients_ip = [
+        cl.recv_variable(f'client_ip', p).decode()
+        for p in participants if p.role == 'client'
+    ]
 
-        # Get server IP (current machine's IP) and send to the clients
-        server_ip = get_local_ip()
-        cl.send_variable(
-            "server_ip",
-            server_ip,
-            [p for p in participants if p.role == "client"]
-        )
+    # Get server IP (current machine's IP) and send to the clients
+    server_ip = get_local_ip()
+    cl.send_variable(
+        "server_ip",
+        server_ip,
+        [p for p in participants if p.role == "client"]
+    )
 
-        # Load configuration and setup server
-        config = load_config_from_param_and_check(param)
+    # Load configuration and setup server
+    config = load_config_from_param_and_check(param)
 
-        # Configure FedML
-        print('Setup server...')
-        fedml_config = config_fedml_server(
-            config, clients_ip, participant_root_dir)
-        args = init_fedml_server(fedml_config, participant_root_dir)
+    # Download data
+    download_data(config['dataset'])
 
-        # Download data
-        download_data(args)
+    if config.get('mode', '') == 'simulation':
+        run_simulation(config, participant_root_dir)
+    else:
+        try:
+            # Configure FedML
+            print('Setup server...')
+            fedml_config = config_fedml_server(
+                config, clients_ip, participant_root_dir)
+            args = init_fedml_server(fedml_config, participant_root_dir)
 
-        # Send notification to the clients that the server is ready
-        cl.send_variable(
-            "server_setup_done",
-            True,
-            [p for p in participants if p.role == "client"]
-        )
-    except Exception as e:
-        # Send notification to the clients that the server raised an error
-        cl.send_variable(
-            "server_setup_done",
-            False,
-            [p for p in participants if p.role == "client"]
-        )
-        raise e
+            # Send notification to the clients that the server is ready
+            cl.send_variable(
+                "server_setup_done",
+                True,
+                [p for p in participants if p.role == "client"]
+            )
+        except Exception as e:
+            # Send notification to the clients that the server raised an error
+            cl.send_variable(
+                "server_setup_done",
+                False,
+                [p for p in participants if p.role == "client"]
+            )
+            raise e
 
-    # Run FedML
-    run_fedml(args, participant_root_dir)
+        # Run FedML
+        run_fedml(args, participant_root_dir)
 
     # Write output and log
     output, log = write_file(participant_id, participant_root_dir)
@@ -387,7 +410,7 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     ][0]
 
     # Create task directory
-    task_root_dir = f'{ROOT_DIR}/{FRAMEWORK}/{task_id}'
+    task_root_dir = f'{LOGGING_DIR}/{FRAMEWORK}/{task_id}'
     participant_root_dir = f'{task_root_dir}/{participant_id}'
     os.makedirs(participant_root_dir, exist_ok=True)
 
@@ -408,28 +431,32 @@ def run_client(cl: CL.CoLink, param: bytes, participants: List[CL.Participant]):
     # Load configuration and setup server
     config = load_config_from_param_and_check(param)
 
-    # Receive notification from the server that the server is ready
-    print(f'[{participant_id}] Waiting for server setup...')
-    is_server_done = cl.recv_variable("server_setup_done", p_server).decode()
-    if is_server_done == 'False':
-        raise Exception('Server raised an error')
+    if config.get('mode', '') == 'simulation':
+        pass
+    else:
+        # Receive notification from the server that the server is ready
+        print(f'[{participant_id}] Waiting for server setup...')
+        is_server_done = cl.recv_variable(
+            "server_setup_done", p_server).decode()
+        if is_server_done == 'False':
+            raise Exception('Server raised an error')
 
-    # Configure FedML
-    fedml_config = config_fedml_client(
-        config, participant_id, server_ip, participant_root_dir)
-    args = init_fedml_client(
-        fedml_config, participant_id, participant_root_dir)
+        # Download data
+        download_data(config['dataset'])
 
-    # Download data
-    download_data(args)
+        # Configure FedML
+        fedml_config = config_fedml_client(
+            config, participant_id, server_ip, participant_root_dir)
+        args = init_fedml_client(
+            fedml_config, participant_id, participant_root_dir)
 
-    # Run FedML
-    run_fedml(args, participant_root_dir)
+        # Run FedML
+        run_fedml(args, participant_root_dir)
 
-    # Write output and log
-    output, log = write_file(participant_id, participant_root_dir)
-    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
-    cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
+        # Write output and log
+        output, log = write_file(participant_id, participant_root_dir)
+        cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:output", output)
+        cl.create_entry(f"{UNIFED_TASK_DIR}:{cl.get_task_id()}:log", log)
 
     return json.dumps({
         "server_ip": server_ip,

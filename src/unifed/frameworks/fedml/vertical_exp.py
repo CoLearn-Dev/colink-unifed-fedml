@@ -1,3 +1,5 @@
+import os
+
 from sklearn.utils import shuffle
 
 from .src.data.preprocessing_data import (breast_load_two_party_data,
@@ -11,23 +13,26 @@ from .src.standalone.classical_vertical_fl.vfl import \
 from .src.standalone.classical_vertical_fl.vfl_fixture import \
     FederatedLearningFixture
 
+from .src.logger import LoggerManager
+
 # from fedml_api.data_preprocessing.preprocessing_data import dvisits_load_two_party_data, motor_load_two_party_data, vehicle_scale_load_two_party_data
+
+DATA_DIR = os.path.expanduser('~/flbenchmark.working/data/')
 
 
 def load_data(dataset_name):
+    ori_dataset_name = dataset_name.replace('_vertical', '')
+    data_dir = DATA_DIR + f'{dataset_name}/{ori_dataset_name}_hetero_'
     if dataset_name == 'breast_vertical':
-        data_dir = "data/breast_vertical/breast_hetero_"
         train, test = breast_load_two_party_data(data_dir)
     elif dataset_name == 'default_credit_vertical':
-        data_dir = "data/default_credit_vertical/default_credit_hetero_"
         train, test = default_credit_load_two_party_data(data_dir)
     elif dataset_name == 'give_credit_vertical':
-        data_dir = "data/give_credit_vertical/give_credit_hetero_"
         train, test = give_credit_load_two_party_data(data_dir)
     return train, test
 
 
-def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, config):
+def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, config, output_dir):
     dimension_ab = {
         'breast_vertical': (10, 20),
         'default_credit_vertical': (13, 10),
@@ -84,6 +89,8 @@ def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, conf
 
     print("################################ Train Federated Models ############################")
 
+    LoggerManager.get_logger(0, "client", output_dir)
+    LoggerManager.get_logger(1, "client", output_dir)
     fl_fixture = FederatedLearningFixture(federatedLearning)
 
     train_data = {federatedLearning.get_main_party_id(): {"X": Xa_train, "Y": y_train},
@@ -95,8 +102,10 @@ def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, conf
     fl_fixture.fit(train_data=train_data, test_data=test_data,
                    epochs=epoch, batch_size=batch_size)
 
+    LoggerManager.reset()
 
-def run_simulation_vertical(config):
+
+def run_simulation_vertical(config, output_dir):
     train, test = load_data(config['dataset'])
     Xa_train, Xb_train, y_train = train
     Xa_test, Xb_test, y_test = test
@@ -112,4 +121,5 @@ def run_simulation_vertical(config):
         learning_rate=config['training']['learning_rate'],
         epoch=config['training']['epochs'],
         config=config,
+        output_dir=output_dir,
     )

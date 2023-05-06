@@ -9,6 +9,8 @@ import flbenchmark.logging
 
 from .vfl import VerticalMultiplePartyLogisticRegressionFederatedLearning
 
+from ...logger import LoggerManager
+
 
 def compute_correct_prediction(*, y_targets, y_prob_preds, threshold=0.5):
     y_hat_lbls = []
@@ -62,8 +64,8 @@ class FederatedLearningFixture(object):
         loss_list = []
         # running_time_list = []
 
-        logger0 = flbenchmark.logging.BasicLogger(id=0, agent_type='client')
-        logger1 = flbenchmark.logging.BasicLogger(id=1, agent_type='client')
+        logger0 = LoggerManager.get_logger(0)
+        logger1 = LoggerManager.get_logger(1)
         self.federated_learning.set_logger(logger0, logger1)
 
         logger0.training_start()
