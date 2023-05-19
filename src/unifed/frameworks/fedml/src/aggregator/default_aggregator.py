@@ -1,16 +1,25 @@
 import copy
 import logging
+import traceback
 
 import numpy as np
 import torch
-from sklearn.metrics import roc_auc_score
-from torch import nn
-
 import wandb
 from fedml import mlops
 from fedml.ml.aggregator.default_aggregator import DefaultServerAggregator
+from sklearn.metrics import roc_auc_score
+from torch import nn
 
 from ..logger import LoggerManager
+
+AUC = [
+    'breast_horizontal',
+    'default_credit_horizontal',
+    'give_credit_horizontal',
+    'breast_vertical',
+    'default_credit_vertical',
+    'give_credit_vertical',
+]
 
 
 class UniFedServerAggregator(DefaultServerAggregator):
@@ -69,9 +78,11 @@ class UniFedServerAggregator(DefaultServerAggregator):
                 else:
                     _, predicted = torch.max(pred, 1)
                     correct = predicted.eq(target).sum()
-                    metrics['predicted'].append(
-                        predicted.detach().cpu().numpy())
-                    metrics['truth'].append(target.detach().cpu().numpy())
+                
+                metrics['predicted'].append(
+                    pred[:, -1].reshape(-1).detach().cpu().numpy())
+                metrics['truth'].append(
+                    target.reshape(-1).detach().cpu().numpy())
 
                 metrics["test_correct"] += correct.item()
                 metrics["test_loss"] += loss.item() * target.size(0)
@@ -117,10 +128,11 @@ class UniFedServerAggregator(DefaultServerAggregator):
         with self.logger.model_evaluation() as e:
             e.report_metric('loss', test_loss)
             e.report_metric('accuracy', test_acc)
-            try:
-                auc = roc_auc_score(metrics['predicted'], metrics['truth'])
-                e.report_metric('auc', auc)
-            except:
-                pass
+            if args.dataset in AUC:
+                try:
+                    auc = roc_auc_score(metrics['truth'], metrics['predicted'])
+                    e.report_metric('auc', auc)
+                except Exception as e:
+                    traceback.print_exc()
 
         return (test_acc, test_loss, None, None)
