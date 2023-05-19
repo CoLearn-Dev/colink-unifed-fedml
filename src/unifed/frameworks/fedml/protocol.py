@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 from typing import List
+import time
 
 import colink as CL
 import fedml
@@ -188,7 +189,7 @@ def config_fedml(config, ipconfig_fn):
             'training_type': 'cross_silo',
             'scenario': 'horizontal',
             'using_mlops': False,
-            'random_seed': 0,
+            'random_seed': int(time.time()),
         },
         'data_args': {
             'dataset': config['dataset'],
