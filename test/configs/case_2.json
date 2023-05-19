@@ -2,7 +2,7 @@
   "framework": "fedml",
   "dataset": "give_credit_horizontal",
   "algorithm": "fed_avg",
-  "model": "mlp_128",
+  "model": "mlp_128_128_128",
   "deployment": {
     "mode": "colink",
     "participants": [
