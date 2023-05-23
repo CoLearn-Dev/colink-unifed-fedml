@@ -216,7 +216,7 @@ def config_fedml(config, ipconfig_fn):
             'frequency_of_the_test': 1,
         },
         'device_args': {
-            'worker_num': config['training']['tot_client_num'],
+            'worker_num': config['training']['client_per_round'],
             'using_gpu': False,
             'gpu_mapping_file': 'src/unifed/frameworks/fedml/config/gpu_mapping.yaml',
             'gpu_mapping_key': 'mapping_default',
