@@ -1,6 +1,7 @@
 import logging
 from time import time
-import flbenchmark.logging
+
+from unifed.frameworks.fedml.src.logger import LoggerManager
 
 
 def getbyte(w):
@@ -11,9 +12,8 @@ def getbyte(w):
 
 
 class Client:
-
     def __init__(self, client_idx, local_training_data, local_test_data, local_sample_number, config, device,
-                 model_trainer):
+                 model_trainer, output_dir):
         self.client_idx = client_idx
         self.local_training_data = local_training_data
         self.local_test_data = local_test_data
@@ -26,8 +26,10 @@ class Client:
         self.model_trainer = model_trainer
         self.time = time()
 
-        self.logger = flbenchmark.logging.BasicLogger(
-            id=client_idx + 1, agent_type='client')
+        # self.logger = flbenchmark.logging.BasicLogger(
+        # id=client_idx + 1, agent_type='client')
+        self.logger = LoggerManager.get_logger(
+            client_idx + 1, 'client', output_dir)
 
     def update_local_dataset(self, client_idx, local_training_data, local_test_data, local_sample_number):
         self.client_idx = client_idx

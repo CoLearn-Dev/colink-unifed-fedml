@@ -121,7 +121,7 @@ def write_file(participant_id, output_dir):
 
 
 def run_simulation(config, output_dir):
-    if config['dataset'].split('_')[-1] == 'horizontal':
+    if config['dataset'].split('_')[-1] == 'horizontal' or config['dataset'] == 'femnist':
         run_simulation_horizontal(config, output_dir)
     elif config['dataset'].split('_')[-1] == 'vertical':
         run_simulation_vertical(config, output_dir)

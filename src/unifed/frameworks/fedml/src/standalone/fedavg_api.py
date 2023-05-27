@@ -8,6 +8,8 @@ import torch
 from fedml.simulation.sp import fedavg
 from sklearn.metrics import roc_auc_score
 
+from unifed.frameworks.fedml.src.logger import LoggerManager
+
 from .client import Client
 
 AUC = [
@@ -28,7 +30,7 @@ def getbyte(w):
 
 
 class FedAvgAPI(fedavg.FedAvgAPI):
-    def __init__(self, dataset, device, config, model_trainer, is_regression):
+    def __init__(self, dataset, device, config, model_trainer, output_dir, is_regression):
         self.device = device
         self.config = config
         [
@@ -57,6 +59,8 @@ class FedAvgAPI(fedavg.FedAvgAPI):
 
         self.model_trainer = model_trainer
 
+        self.output_dir = output_dir
+
         self._setup_clients(
             train_data_local_num_dict,
             train_data_local_dict,
@@ -67,8 +71,16 @@ class FedAvgAPI(fedavg.FedAvgAPI):
     def _setup_clients(self, train_data_local_num_dict, train_data_local_dict, test_data_local_dict, model_trainer):
         logging.info("############setup_clients (START)#############")
         for client_idx in range(self.config['training']['client_per_round']):
-            c = Client(client_idx, train_data_local_dict[client_idx], test_data_local_dict[client_idx],
-                       train_data_local_num_dict[client_idx], self.config['training'], self.device, model_trainer)
+            c = Client(
+                client_idx,
+                train_data_local_dict[client_idx],
+                test_data_local_dict[client_idx],
+                train_data_local_num_dict[client_idx],
+                self.config['training'],
+                self.device,
+                model_trainer,
+                self.output_dir,
+            )
             self.client_list.append(c)
         logging.info("############setup_clients (END)#############")
 
@@ -77,104 +89,100 @@ class FedAvgAPI(fedavg.FedAvgAPI):
         report_my = 0
 
         w_global = self.model_trainer.get_model_params()
-        with flbenchmark.logging.BasicLogger(id=0, agent_type='aggregator') as logger:
-            with logger.training():
-                for idx, client in enumerate(self.client_list):
-                    # client.logger.start()
-                    client.logger.training_start()
 
-                for round_idx in range(self.config['training']['epochs']):
-                    with logger.training_round() as tr:
-                        tr.report_metric(
-                            'client_num', self.config["training"]["client_per_round"])
-                        logging.info(
-                            "################Communication round : {}".format(round_idx))
+        logger = LoggerManager.get_logger(0, 'aggregator', self.output_dir)
+        with logger.training():
+            for idx, client in enumerate(self.client_list):
+                client.logger.training_start()
 
-                        for idx, client in enumerate(self.client_list):
-                            # client.logger.start()
-                            client.logger.training_round_start()
+            for round_idx in range(self.config['training']['epochs']):
+                with logger.training_round() as tr:
+                    tr.report_metric(
+                        'client_num', self.config["training"]["client_per_round"])
+                    logging.info(
+                        "################Communication round : {}".format(round_idx))
 
-                        w_locals = []
+                    for idx, client in enumerate(self.client_list):
+                        # client.logger.start()
+                        client.logger.training_round_start()
 
-                        """
-                        for scalability: following the original FedAvg algorithm, we uniformly sample a fraction of clients in each round.
-                        Instead of changing the 'Client' instances, our implementation keeps the 'Client' instances and then updates their local dataset 
-                        """
-                        client_indexes = self._client_sampling(round_idx, self.config['training']['tot_client_num'],
-                                                               self.config['training']['client_per_round'])
-                        logging.info("client_indexes = " + str(client_indexes))
+                    w_locals = []
 
-                        for idx, client in enumerate(self.client_list):
-                            # update dataset
-                            client_idx = client_indexes[idx]
-                            client.update_local_dataset(
-                                client_idx,
-                                self.train_data_local_dict[client_idx],
-                                self.test_data_local_dict[client_idx],
-                                self.train_data_local_num_dict[client_idx],
-                            )
+                    """
+                    for scalability: following the original FedAvg algorithm, we uniformly sample a fraction of clients in each round.
+                    Instead of changing the 'Client' instances, our implementation keeps the 'Client' instances and then updates their local dataset 
+                    """
+                    client_indexes = self._client_sampling(round_idx, self.config['training']['tot_client_num'],
+                                                           self.config['training']['client_per_round'])
+                    logging.info("client_indexes = " + str(client_indexes))
 
-                            # train on new dataset
-                            w = client.train(copy.deepcopy(w_global))
-                            communication_bytes += getbyte(w)
-                            # self.logger.info("local weights = " + str(w))
-                            w_locals.append(
-                                (client.get_sample_number(), copy.deepcopy(w)))
+                    for idx, client in enumerate(self.client_list):
+                        # update dataset
+                        client_idx = client_indexes[idx]
+                        client.update_local_dataset(
+                            client_idx,
+                            self.train_data_local_dict[client_idx],
+                            self.test_data_local_dict[client_idx],
+                            self.train_data_local_num_dict[client_idx],
+                        )
 
-                            # client back to server
-                            communication_time += time() - client.time
+                        # train on new dataset
+                        w = client.train(copy.deepcopy(w_global))
+                        communication_bytes += getbyte(w)
+                        # self.logger.info("local weights = " + str(w))
+                        w_locals.append(
+                            (client.get_sample_number(), copy.deepcopy(w)))
 
-                        # update global weights
-                        with logger.computation() as c:
-                            w_global = self._aggregate(w_locals)
+                        # client back to server
+                        communication_time += time() - client.time
 
-                        for idx, client in enumerate(self.client_list):
-                            with logger.communication(target_id=idx + 1) as c:
-                                c.report_metric('byte', getbyte(w_global))
+                    # update global weights
+                    with logger.computation() as c:
+                        w_global = self._aggregate(w_locals)
 
-                        timea = time()
-                        self.model_trainer.set_model_params(w_global)
-                        # server to client time
-                        communication_time += time() - timea
+                    for idx, client in enumerate(self.client_list):
+                        with logger.communication(target_id=idx + 1) as c:
+                            c.report_metric('byte', getbyte(w_global))
 
-                        # test results
-                        # at last round
-                        if round_idx == self.config['training']['epochs'] - 1:
-                            btime = time()
-                            report_my = self._local_test_on_all_clients(
-                                round_idx)
-                            finaltime = time() - btime
-                        # per {frequency_of_the_test} round
-                        elif round_idx % self.config['training'].get('frequency_of_the_test', 1) == 0:
-                            # if self.args.dataset.startswith("stackoverflow"):
-                            pass
-                            # self._local_test_on_validation_set(round_idx)
-                            # else:
-                            # self._local_test_on_all_clients(round_idx)
+                    timea = time()
+                    self.model_trainer.set_model_params(w_global)
+                    # server to client time
+                    communication_time += time() - timea
 
-                        for idx, client in enumerate(self.client_list):
-                            # client.logger.start()
-                            client.logger.training_round_end()
+                    # test results
+                    # at last round
+                    if round_idx == self.config['training']['epochs'] - 1:
+                        btime = time()
+                        report_my = self._local_test_on_all_clients(
+                            round_idx)
+                        finaltime = time() - btime
+                    # per {frequency_of_the_test} round
+                    elif round_idx % self.config['training'].get('frequency_of_the_test', 1) == 0:
+                        # if self.args.dataset.startswith("stackoverflow"):
+                        pass
+                        # self._local_test_on_validation_set(round_idx)
+                        # else:
+                        # self._local_test_on_all_clients(round_idx)
 
-                for idx, client in enumerate(self.client_list):
-                    client.logger.end()
+                    for idx, client in enumerate(self.client_list):
+                        # client.logger.start()
+                        client.logger.training_round_end()
 
-                # print("Total communication time is {}".format(communication_time))
-                # print("Total communication cost is {}".format(communication_bytes * 2))
-                # print("Total communication round is {}".format(self.args.comm_round))
-                for idx, client in enumerate(self.client_list):
-                    # client.logger.start()
-                    client.logger.training_end()
+        for idx, client in enumerate(self.client_list):
+            client.logger.training_end()
+            client.logger.end()
 
-            with logger.model_evaluation() as e:
-                sleep(finaltime)
-                if self.is_regression:
-                    e.report_metric('mse', report_my)
-                elif self.config['dataset'] in AUC:
-                    # e.report_metric('accuracy', report_my[1] * 100)
-                    e.report_metric('auc', report_my)
-                else:
-                    e.report_metric('accuracy', report_my)
+        with logger.model_evaluation() as e:
+            sleep(finaltime)
+            if self.is_regression:
+                e.report_metric('mse', report_my)
+            elif self.config['dataset'] in AUC:
+                # e.report_metric('accuracy', report_my[1] * 100)
+                e.report_metric('auc', report_my)
+            else:
+                e.report_metric('accuracy', report_my)
+
+        logger.end()
 
     def _generate_validation_set(self, num_samples=10000):
         test_data_num = len(self.test_global.dataset)

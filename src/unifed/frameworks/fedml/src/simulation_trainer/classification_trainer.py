@@ -31,7 +31,7 @@ class ClassificationTrainer():
                                          weight_decay=optim_param['weight_decay'], amsgrad=True)
 
         epoch_loss = []
-        for epoch in range(config['epochs']):
+        for epoch in range(config['inner_step']):
             with logger.computation() as c:
                 batch_loss = []
                 for batch_idx, (x, labels) in enumerate(train_data):

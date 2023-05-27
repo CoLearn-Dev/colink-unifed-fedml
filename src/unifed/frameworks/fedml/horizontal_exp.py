@@ -1,8 +1,8 @@
-import logging
 import os
 
-import torch
 from fedml.model.linear.lr import LogisticRegression
+
+from unifed.frameworks.fedml.src.logger import LoggerManager
 
 from .src.data.breast_horizontal.data_loader import \
     load_partition_data_breast_horizontal
@@ -38,6 +38,8 @@ LEAF_DATASETS = (
     'celeba',
     'shakespeare',
 )
+
+DATA_DIR = os.path.expanduser('~/flbenchmark.working/data/')
 
 
 def load_data(dataset_name, batch_size, data_dir):
@@ -122,16 +124,30 @@ def custom_model_trainer(config, model):
         return ClassificationTrainer(model)
 
 
-def run_simulation_horizontal(config):
-    device = torch.device(
-        "cuda:" + str(config.get('gpu', 0))
-        if torch.cuda.is_available()
-        else "cpu"
+def run_simulation_horizontal(config, output_dir):
+    # device = torch.device(
+    #     "cuda:" + str(config.get('gpu', 0))
+    #     if torch.cuda.is_available()
+    #     else "cpu"
+    # )
+
+    # dataset = load_data(config['training'], config['dataset'])
+    # model = create_model(
+    #     config, model_name=config['model'], output_dim=dataset[7])
+
+    # init device
+    device = 'cpu'
+
+    # load dataset
+    dataset, input_dim, output_dim = load_data(
+        config['dataset'],
+        config['training']['batch_size'],
+        DATA_DIR
     )
 
-    dataset = load_data(config['training'], config['dataset'])
-    model = create_model(
-        config, model_name=config['model'], output_dim=dataset[7])
+    # load model
+    model = create_model(config['model'], input_dim, output_dim)
+
     model_trainer = custom_model_trainer(config, model)
 
     fedavgAPI = FedAvgAPI(
@@ -139,6 +155,9 @@ def run_simulation_horizontal(config):
         device,
         config,
         model_trainer,
-        is_regression=(config['dataset'] == 'student_horizontal')
+        output_dir,
+        is_regression=(config['dataset'] == 'student_horizontal'),
     )
     fedavgAPI.train()
+
+    LoggerManager.reset()
