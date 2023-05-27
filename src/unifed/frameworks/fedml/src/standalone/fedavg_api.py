@@ -149,38 +149,22 @@ class FedAvgAPI(fedavg.FedAvgAPI):
                     # server to client time
                     communication_time += time() - timea
 
-                    # test results
-                    # at last round
-                    if round_idx == self.config['training']['epochs'] - 1:
-                        btime = time()
-                        report_my = self._local_test_on_all_clients(
-                            round_idx)
-                        finaltime = time() - btime
-                    # per {frequency_of_the_test} round
-                    elif round_idx % self.config['training'].get('frequency_of_the_test', 1) == 0:
-                        # if self.args.dataset.startswith("stackoverflow"):
-                        pass
-                        # self._local_test_on_validation_set(round_idx)
-                        # else:
-                        # self._local_test_on_all_clients(round_idx)
-
                     for idx, client in enumerate(self.client_list):
-                        # client.logger.start()
                         client.logger.training_round_end()
+
+                    with logger.model_evaluation() as e:
+                        report_my = self._local_test_on_all_clients(round_idx)
+
+                        if self.is_regression:
+                            e.report_metric('mse', report_my)
+                        elif self.config['dataset'] in AUC:
+                            e.report_metric('auc', report_my)
+                        else:
+                            e.report_metric('accuracy', report_my)
 
         for idx, client in enumerate(self.client_list):
             client.logger.training_end()
             client.logger.end()
-
-        with logger.model_evaluation() as e:
-            sleep(finaltime)
-            if self.is_regression:
-                e.report_metric('mse', report_my)
-            elif self.config['dataset'] in AUC:
-                # e.report_metric('accuracy', report_my[1] * 100)
-                e.report_metric('auc', report_my)
-            else:
-                e.report_metric('accuracy', report_my)
 
         logger.end()
 

@@ -210,7 +210,10 @@ def config_fedml(config, ipconfig_fn):
             'batch_size': config['training']['batch_size'],
             'client_optimizer': config['training']['optimizer'],
             'learning_rate': config['training']['learning_rate'],
+            'momentum': config['training']['optimizer_param']['momentum'],
+            'dampening': config['training']['optimizer_param']['dampening'],
             'weight_decay': config['training']['optimizer_param']['weight_decay'],
+            'nesterov': config['training']['optimizer_param']['nesterov'],
         },
         'validate_args': {
             'frequency_of_the_test': 1,

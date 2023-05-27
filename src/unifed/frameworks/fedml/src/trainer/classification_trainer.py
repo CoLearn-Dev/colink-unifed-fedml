@@ -28,6 +28,10 @@ class ClassificationTrainer(ClientTrainer):
             optimizer = torch.optim.SGD(
                 filter(lambda p: p.requires_grad, self.model.parameters()),
                 lr=args.learning_rate,
+                momentum=args.momentum,
+                weight_decay=args.weight_decay,
+                dampening=args.dampening,
+                nesterov=args.nesterov,
             )
         else:
             optimizer = torch.optim.Adam(
