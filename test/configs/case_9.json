@@ -1,32 +1,25 @@
 {
   "framework": "fedml",
-  "dataset": "give_credit_horizontal",
+  "dataset": "femnist",
   "algorithm": "fed_avg",
-  "model": "logistic_regression",
+  "model": "lenet",
+  "mode": "simulation",
   "deployment": {
     "mode": "colink",
     "participants": [
       {
         "user_id": "0",
         "role": "server"
-      },
-      {
-        "user_id": "1",
-        "role": "client"
-      },
-      {
-        "user_id": "2",
-        "role": "client"
       }
     ]
   },
   "training": {
-    "epochs": 30,
-    "batch_size": 64,
+    "epochs": 2000,
+    "batch_size": 8,
     "inner_step": 1,
-    "client_per_round": 2,
-    "tot_client_num": 2,
-    "learning_rate": 0.01,
+    "client_per_round": 20,
+    "tot_client_num": 178,
+    "learning_rate": 0.001,
     "loss_func": "cross_entropy",
     "optimizer": "sgd",
     "optimizer_param": {

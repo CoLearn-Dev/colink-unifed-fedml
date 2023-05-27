@@ -97,7 +97,7 @@
     "batch_size": 8,
     "inner_step": 1,
     "client_per_round": 20,
-    "tot_client_num": 20,
+    "tot_client_num": 178,
     "learning_rate": 0.001,
     "loss_func": "cross_entropy",
     "optimizer": "sgd",

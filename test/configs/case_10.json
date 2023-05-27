@@ -3,20 +3,13 @@
   "dataset": "give_credit_horizontal",
   "algorithm": "fed_avg",
   "model": "logistic_regression",
+  "mode": "simulation",
   "deployment": {
     "mode": "colink",
     "participants": [
       {
         "user_id": "0",
         "role": "server"
-      },
-      {
-        "user_id": "1",
-        "role": "client"
-      },
-      {
-        "user_id": "2",
-        "role": "client"
       }
     ]
   },
