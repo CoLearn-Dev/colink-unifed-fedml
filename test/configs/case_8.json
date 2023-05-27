@@ -1,39 +1,112 @@
 {
-    "framework": "fedml",
-    "dataset": "default_credit_vertical",
-    "algorithm": "Hetero-LR",
-    "model": "logistic_regression",
-    "mode": "simulation",
-    "deployment": {
-        "mode": "colink",
-        "participants": [
-            {
-                "user_id": "03eb942350535b01a09613ae9ba3b5817dccb3bf51f1b6d3c5f46a055055c2e535",
-                "role": "server"
-            },
-            {
-                "user_id": "0334575a3240bbc2e7e5a8d9215ed0787b79e18f451aaca126bbcc536658123467",
-                "role": "client"
-            },
-            {
-                "user_id": "026843e5227b31bc352be4a54be5dcf0df994ba7979165fad53c636d20db882520",
-                "role": "client"
-            }
-        ]
-    },
-    "training": {
-        "epochs": 10,
-        "batch_size": 128,
-        "learning_rate": 0.01,
-        "loss_func": "cross_entropy",
-        "optimizer": "sgd",
-        "inner_step": 1,
-        "client_per_round": 2,
-        "optimizer_param": {
-            "momentum": 0.9,
-            "dampening": 0,
-            "weight_decay": 0,
-            "nesterov": false
-        }
+  "framework": "fedml",
+  "dataset": "femnist",
+  "algorithm": "fed_avg",
+  "model": "lenet",
+  "mode": "simulation",
+  "deployment": {
+    "mode": "colink",
+    "participants": [
+      {
+        "user_id": "0",
+        "role": "server"
+      },
+      {
+        "user_id": "1",
+        "role": "client"
+      },
+      {
+        "user_id": "2",
+        "role": "client"
+      },
+      {
+        "user_id": "3",
+        "role": "client"
+      },
+      {
+        "user_id": "4",
+        "role": "client"
+      },
+      {
+        "user_id": "5",
+        "role": "client"
+      },
+      {
+        "user_id": "6",
+        "role": "client"
+      },
+      {
+        "user_id": "7",
+        "role": "client"
+      },
+      {
+        "user_id": "8",
+        "role": "client"
+      },
+      {
+        "user_id": "9",
+        "role": "client"
+      },
+      {
+        "user_id": "10",
+        "role": "client"
+      },
+      {
+        "user_id": "11",
+        "role": "client"
+      },
+      {
+        "user_id": "12",
+        "role": "client"
+      },
+      {
+        "user_id": "13",
+        "role": "client"
+      },
+      {
+        "user_id": "14",
+        "role": "client"
+      },
+      {
+        "user_id": "15",
+        "role": "client"
+      },
+      {
+        "user_id": "16",
+        "role": "client"
+      },
+      {
+        "user_id": "17",
+        "role": "client"
+      },
+      {
+        "user_id": "18",
+        "role": "client"
+      },
+      {
+        "user_id": "19",
+        "role": "client"
+      },
+      {
+        "user_id": "20",
+        "role": "client"
+      }
+    ]
+  },
+  "training": {
+    "epochs": 2000,
+    "batch_size": 8,
+    "inner_step": 1,
+    "client_per_round": 20,
+    "tot_client_num": 178,
+    "learning_rate": 0.001,
+    "loss_func": "cross_entropy",
+    "optimizer": "sgd",
+    "optimizer_param": {
+      "momentum": 0.9,
+      "dampening": 0,
+      "weight_decay": 0,
+      "nesterov": false
     }
+  }
 }
