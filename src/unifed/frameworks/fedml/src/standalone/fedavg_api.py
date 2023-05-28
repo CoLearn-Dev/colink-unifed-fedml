@@ -152,15 +152,15 @@ class FedAvgAPI(fedavg.FedAvgAPI):
                     for idx, client in enumerate(self.client_list):
                         client.logger.training_round_end()
 
-                    with logger.model_evaluation() as e:
-                        report_my = self._local_test_on_all_clients(round_idx)
+            with logger.model_evaluation() as e:
+                report_my = self._local_test_on_all_clients(round_idx)
 
-                        if self.is_regression:
-                            e.report_metric('mse', report_my)
-                        elif self.config['dataset'] in AUC:
-                            e.report_metric('auc', report_my)
-                        else:
-                            e.report_metric('accuracy', report_my)
+                if self.is_regression:
+                    e.report_metric('mse', report_my)
+                elif self.config['dataset'] in AUC:
+                    e.report_metric('auc', report_my)
+                else:
+                    e.report_metric('accuracy', report_my)
 
         for idx, client in enumerate(self.client_list):
             client.logger.training_end()
