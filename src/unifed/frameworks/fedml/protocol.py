@@ -193,9 +193,6 @@ def config_fedml(config, ipconfig_fn):
         },
         'data_args': {
             'dataset': config['dataset'],
-            'data_cache_dir': 'data',
-            'partition_method': 'hetero',
-            'partition_alpha': 0.5,
         },
         'model_args': {
             'model': config['model'],
@@ -219,10 +216,7 @@ def config_fedml(config, ipconfig_fn):
             'frequency_of_the_test': 1,
         },
         'device_args': {
-            'worker_num': config['training']['client_per_round'],
             'using_gpu': False,
-            'gpu_mapping_file': 'src/unifed/frameworks/fedml/config/gpu_mapping.yaml',
-            'gpu_mapping_key': 'mapping_default',
         },
         'comm_args': {
             'backend': 'GRPC',
@@ -230,8 +224,6 @@ def config_fedml(config, ipconfig_fn):
         },
         'tracking_args': {
             'enable_wandb': False,
-            'wandb_project': 'fedml',
-            'wandb_name': 'fedml_torch_fedavg',
         },
     }
 

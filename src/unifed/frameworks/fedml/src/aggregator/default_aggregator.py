@@ -66,23 +66,18 @@ class UniFedServerAggregator(DefaultServerAggregator):
 
                 if args.dataset == "stackoverflow_lr":
                     predicted = (pred > 0.5).int()
-                    correct = predicted.eq(target).sum(
-                        axis=-1).eq(target.size(1)).sum()
-                    true_positive = ((target * predicted) >
-                                     0.1).int().sum(axis=-1)
-                    precision = true_positive / \
-                        (predicted.sum(axis=-1) + 1e-13)
+                    correct = predicted.eq(target).sum(axis=-1).eq(target.size(1)).sum()
+                    true_positive = ((target * predicted) > 0.1).int().sum(axis=-1)
+                    precision = true_positive / (predicted.sum(axis=-1) + 1e-13)
                     recall = true_positive / (target.sum(axis=-1) + 1e-13)
                     metrics["test_precision"] += precision.sum().item()
                     metrics["test_recall"] += recall.sum().item()
                 else:
                     _, predicted = torch.max(pred, 1)
                     correct = predicted.eq(target).sum()
-                
-                metrics['predicted'].append(
-                    pred[:, -1].reshape(-1).detach().cpu().numpy())
-                metrics['truth'].append(
-                    target.reshape(-1).detach().cpu().numpy())
+
+                metrics['predicted'].append(pred[:, -1].reshape(-1).detach().cpu().numpy())
+                metrics['truth'].append(target.reshape(-1).detach().cpu().numpy())
 
                 metrics["test_correct"] += correct.item()
                 metrics["test_loss"] += loss.item() * target.size(0)
@@ -96,36 +91,36 @@ class UniFedServerAggregator(DefaultServerAggregator):
         return metrics
 
     def test(self, test_data, device, args):
-        # test data
-        test_num_samples = []
-        test_tot_corrects = []
-        test_losses = []
-
-        metrics = self._test(test_data, device, args)
-
-        test_tot_correct, test_num_sample, test_loss = (
-            metrics["test_correct"],
-            metrics["test_total"],
-            metrics["test_loss"],
-        )
-        test_tot_corrects.append(copy.deepcopy(test_tot_correct))
-        test_num_samples.append(copy.deepcopy(test_num_sample))
-        test_losses.append(copy.deepcopy(test_loss))
-
-        # test on test dataset
-        test_acc = sum(test_tot_corrects) / sum(test_num_samples)
-        test_loss = sum(test_losses) / sum(test_num_samples)
-        if self.args.enable_wandb:
-            wandb.log({"Test/Acc": test_acc, "round": args.round_idx})
-            wandb.log({"Test/Loss": test_loss, "round": args.round_idx})
-
-        mlops.log({"Test/Acc": test_acc, "round": args.round_idx})
-        mlops.log({"Test/Loss": test_loss, "round": args.round_idx})
-
-        stats = {"test_acc": test_acc, "test_loss": test_loss}
-        logging.info(stats)
-
         with self.logger.model_evaluation() as e:
+            # test data
+            test_num_samples = []
+            test_tot_corrects = []
+            test_losses = []
+
+            metrics = self._test(test_data, device, args)
+
+            test_tot_correct, test_num_sample, test_loss = (
+                metrics["test_correct"],
+                metrics["test_total"],
+                metrics["test_loss"],
+            )
+            test_tot_corrects.append(copy.deepcopy(test_tot_correct))
+            test_num_samples.append(copy.deepcopy(test_num_sample))
+            test_losses.append(copy.deepcopy(test_loss))
+
+            # test on test dataset
+            test_acc = sum(test_tot_corrects) / sum(test_num_samples)
+            test_loss = sum(test_losses) / sum(test_num_samples)
+            if self.args.enable_wandb:
+                wandb.log({"Test/Acc": test_acc, "round": args.round_idx})
+                wandb.log({"Test/Loss": test_loss, "round": args.round_idx})
+
+            mlops.log({"Test/Acc": test_acc, "round": args.round_idx})
+            mlops.log({"Test/Loss": test_loss, "round": args.round_idx})
+
+            stats = {"test_acc": test_acc, "test_loss": test_loss}
+            logging.info(stats)
+
             e.report_metric('loss', test_loss)
             e.report_metric('accuracy', test_acc)
             if args.dataset in AUC:
