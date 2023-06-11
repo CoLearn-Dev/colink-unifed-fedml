@@ -1,0 +1,39 @@
+{
+  "framework": "fedml",
+  "dataset": "breast_horizontal",
+  "algorithm": "fed_avg",
+  "model": "mlp_128",
+  "deployment": {
+    "mode": "colink",
+    "participants": [
+      {
+        "user_id": "0",
+        "role": "server"
+      },
+      {
+        "user_id": "1",
+        "role": "client"
+      },
+      {
+        "user_id": "2",
+        "role": "client"
+      }
+    ]
+  },
+  "training": {
+    "epochs": 30,
+    "batch_size": 32,
+    "inner_step": 1,
+    "client_per_round": 2,
+    "tot_client_num": 2,
+    "learning_rate": 0.01,
+    "loss_func": "cross_entropy",
+    "optimizer": "sgd",
+    "optimizer_param": {
+      "momentum": 0.9,
+      "dampening": 0,
+      "weight_decay": 0,
+      "nesterov": false
+    }
+  }
+}

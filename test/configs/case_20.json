@@ -1,28 +1,28 @@
 {
   "framework": "fedml",
-  "dataset": "give_credit_horizontal",
+  "dataset": "breast_horizontal",
   "algorithm": "fed_avg",
-  "model": "mlp_128",
+  "model": "logistic_regression",
   "deployment": {
     "mode": "colink",
     "participants": [
       {
-        "user_id": "03eb942350535b01a09613ae9ba3b5817dccb3bf51f1b6d3c5f46a055055c2e535",
+        "user_id": "0",
         "role": "server"
       },
       {
-        "user_id": "0334575a3240bbc2e7e5a8d9215ed0787b79e18f451aaca126bbcc536658123467",
+        "user_id": "1",
         "role": "client"
       },
       {
-        "user_id": "026843e5227b31bc352be4a54be5dcf0df994ba7979165fad53c636d20db882520",
+        "user_id": "2",
         "role": "client"
       }
     ]
   },
   "training": {
     "epochs": 30,
-    "batch_size": 64,
+    "batch_size": 32,
     "inner_step": 1,
     "client_per_round": 2,
     "tot_client_num": 2,
