@@ -1,6 +1,6 @@
 {
   "framework": "fedml",
-  "dataset": "breast_horizontal",
+  "dataset": "default_credit_vertical",
   "algorithm": "fed_avg",
   "model": "mlp_128_128_128",
   "deployment": {

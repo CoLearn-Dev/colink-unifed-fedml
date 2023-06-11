@@ -2,7 +2,7 @@
   "framework": "fedml",
   "dataset": "femnist",
   "algorithm": "fed_avg",
-  "model": "mlp_128_128_128",
+  "model": "lenet",
   "mode": "simulation",
   "deployment": {
     "mode": "colink",

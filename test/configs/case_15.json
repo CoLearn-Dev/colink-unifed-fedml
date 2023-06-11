@@ -2,7 +2,7 @@
   "framework": "fedml",
   "dataset": "femnist",
   "algorithm": "fed_avg",
-  "model": "logistic_regression",
+  "model": "mlp_128",
   "mode": "simulation",
   "deployment": {
     "mode": "colink",
