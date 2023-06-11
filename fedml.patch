@@ -67,6 +67,19 @@ index 6e4d2b74..13c43d65 100644
  
          MLOpsProfilerEvent.log_to_wandb({"Communication/Send_Total": time.time() - tick})
          mlops.log_client_model_info(
+diff --git a/python/fedml/cross_silo/client/fedml_trainer.py b/python/fedml/cross_silo/client/fedml_trainer.py
+index 827644cc..1aa3c00d 100755
+--- a/python/fedml/cross_silo/client/fedml_trainer.py
++++ b/python/fedml/cross_silo/client/fedml_trainer.py
+@@ -42,7 +42,7 @@ class FedMLTrainer(object):
+ 
+     def update_dataset(self, client_index):
+         self.client_index = client_index
+-
++        
+         if self.train_data_local_dict is not None:
+             if self.args.scenario == FEDML_CROSS_SILO_SCENARIO_HIERARCHICAL:
+                 self.train_local = self.train_data_local_dict[client_index][self.args.proc_rank_in_silo]
 diff --git a/python/fedml/cross_silo/server/fedml_server_manager.py b/python/fedml/cross_silo/server/fedml_server_manager.py
 index f87b9202..6195ffde 100644
 --- a/python/fedml/cross_silo/server/fedml_server_manager.py
@@ -118,24 +131,24 @@ index f87b9202..6195ffde 100644
          MLOpsProfilerEvent.log_to_wandb({"Communiaction/Send_Total": time.time() - tick})
  
 diff --git a/python/fedml/model/finance/vfl_models_standalone.py b/python/fedml/model/finance/vfl_models_standalone.py
-index 89640c84..30824610 100644
+index 89640c84..125b515a 100644
 --- a/python/fedml/model/finance/vfl_models_standalone.py
 +++ b/python/fedml/model/finance/vfl_models_standalone.py
-@@ -4,14 +4,23 @@ import torch.optim as optim
+@@ -2,16 +2,21 @@ import torch
+ import torch.nn as nn
+ import torch.optim as optim
  
++from unifed.frameworks.fedml.horizontal_exp import create_model
++
  
  class DenseModel(nn.Module):
 -    def __init__(self, input_dim, output_dim, learning_rate=0.01, bias=True):
-+    def __init__(self, input_dim, output_dim, learning_rate, optim_param, bias=True):
++    def __init__(self, input_dim, output_dim, model_name, learning_rate, optim_param, bias=True):
          super(DenseModel, self).__init__()
-         self.classifier = nn.Sequential(
+-        self.classifier = nn.Sequential(
 -            nn.Linear(in_features=input_dim, out_features=output_dim, bias=bias),
-+            nn.Linear(
-+                in_features=input_dim,
-+                out_features=output_dim,
-+                bias=bias,
-+            ),
-         )
+-        )
++        self.classifier = create_model(model_name, input_dim, output_dim)
          self.is_debug = False
          self.optimizer = optim.SGD(
 -            self.parameters(), momentum=0.9, weight_decay=0.01, lr=learning_rate
@@ -148,21 +161,17 @@ index 89640c84..30824610 100644
          )
  
      def forward(self, x):
-@@ -38,16 +47,25 @@ class DenseModel(nn.Module):
+@@ -38,16 +43,19 @@ class DenseModel(nn.Module):
  
  
  class LocalModel(nn.Module):
 -    def __init__(self, input_dim, output_dim, learning_rate):
-+    def __init__(self, input_dim, output_dim, learning_rate, optim_param):
++    def __init__(self, input_dim, output_dim, model_name, learning_rate, optim_param):
          super(LocalModel, self).__init__()
-         self.classifier = nn.Sequential(
+-        self.classifier = nn.Sequential(
 -            nn.Linear(in_features=input_dim, out_features=output_dim), nn.LeakyReLU()
-+            nn.Linear(
-+                in_features=input_dim,
-+                out_features=output_dim,
-+            ),
-+            nn.LeakyReLU()
-         )
+-        )
++        self.classifier = create_model(model_name, input_dim, output_dim)
          self.output_dim = output_dim
          self.is_debug = False
          self.learning_rate = learning_rate
@@ -177,6 +186,19 @@ index 89640c84..30824610 100644
          )
  
      def forward(self, x):
+diff --git a/python/fedml/model/linear/lr.py b/python/fedml/model/linear/lr.py
+index 53b5ce0c..05cb8018 100644
+--- a/python/fedml/model/linear/lr.py
++++ b/python/fedml/model/linear/lr.py
+@@ -8,7 +8,7 @@ class LogisticRegression(torch.nn.Module):
+ 
+     def forward(self, x):
+         # try:
+-        outputs = torch.sigmoid(self.linear(x))
++        outputs = self.linear(x)
+         # except:
+         #     print(x.size())
+         #     import pdb
 diff --git a/python/fedml/simulation/sp/classical_vertical_fl/party_models.py b/python/fedml/simulation/sp/classical_vertical_fl/party_models.py
 index 5fa8237c..43b7ecb7 100644
 --- a/python/fedml/simulation/sp/classical_vertical_fl/party_models.py

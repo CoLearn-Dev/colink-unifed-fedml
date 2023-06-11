@@ -50,12 +50,14 @@ def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, conf
     party_a_local_model = LocalModel(
         input_dim=Xa_train.shape[1],
         output_dim=dimension_ab[config["dataset"]][0],
+        model_name=config['model'],
         learning_rate=learning_rate,
         optim_param=config["training"]["optimizer_param"],
     )
     party_b_local_model = LocalModel(
         input_dim=Xb_train.shape[1],
         output_dim=dimension_ab[config["dataset"]][1],
+        model_name=config['model'],
         learning_rate=learning_rate,
         optim_param=config["training"]["optimizer_param"],
     )
@@ -63,6 +65,7 @@ def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, conf
     party_a_dense_model = DenseModel(
         party_a_local_model.get_output_dim(),
         1,
+        model_name=config['model'],
         learning_rate=learning_rate,
         optim_param=config["training"]["optimizer_param"],
         bias=True,
@@ -70,6 +73,7 @@ def run_experiment(train_data, test_data, batch_size, learning_rate, epoch, conf
     party_b_dense_model = DenseModel(
         party_b_local_model.get_output_dim(),
         1,
+        model_name=config['model'],
         learning_rate=learning_rate,
         optim_param=config["training"]["optimizer_param"],
         bias=False,
